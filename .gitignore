@@ -1,0 +1,4 @@
+.*
+*.swo
+*.swp
+/ra3-sdk/build/
