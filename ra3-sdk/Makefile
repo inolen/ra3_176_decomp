@@ -87,6 +87,12 @@ SQLITE_OBJ = $(SQLITE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
 $(SQLITE_OBJ): CFLAGS+=-DNO_TCL
 
+HTTPD_SRC = \
+  $(SRCDIR)/httpd/api.c \
+  $(SRCDIR)/httpd/ip_acl.c \
+  $(SRCDIR)/httpd/protocol.c
+HTTPD_OBJ = $(HTTPD_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+
 GAME_SRC = \
   $(SRCDIR)/game/ai_chat.c \
   $(SRCDIR)/game/ai_cmd.c \
@@ -125,7 +131,7 @@ GAME_OBJ = $(GAME_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
 $(GAME_OBJ): CFLAGS+=-Werror -Wall -DQAGAME
 
-QAGAME_OBJ = $(SQLITE_OBJ) $(GAME_OBJ)
+QAGAME_OBJ = $(SQLITE_OBJ) $(HTTPD_OBJ) $(GAME_OBJ)
 QAGAME = $(OBJDIR)/qagamei386.so
 
 $(QAGAME): $(QAGAME_OBJ)
