@@ -862,6 +862,7 @@ void AIEnter_Observer(bot_state_t *bs) {
 	//reset the bot state
 	BotResetState(bs);
 	bs->ainode = AINode_Observer;
+	trap_Printf("Bot entered observer mode!\n");
 }
 
 /*
@@ -872,6 +873,7 @@ AINode_Observer
 int AINode_Observer(bot_state_t *bs) {
 	//if the bot left observer mode
 	if (!BotIsObserver(bs)) {
+		trap_Printf("Bot left observer mode!\n");
 		AIEnter_Stand(bs);
 	}
 	return qtrue;
