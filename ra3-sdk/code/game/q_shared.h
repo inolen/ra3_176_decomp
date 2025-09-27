@@ -198,6 +198,8 @@ typedef int		clipHandle_t;
 #define NULL ((void *)0)
 #endif
 
+#define UNUSED(x) (void)(x)
+
 #define	MAX_QINT			0x7fffffff
 #define	MIN_QINT			(-MAX_QINT-1)
 
@@ -371,6 +373,10 @@ extern vec4_t	g_color_table[8];
 
 #define DEG2RAD( a ) ( ( (a) * M_PI ) / 180.0F )
 #define RAD2DEG( a ) ( ( (a) * 180.0f ) / M_PI )
+
+#define MIN( a, b ) ( ( a ) < ( b ) ? ( a ) : ( b ) )
+#define MAX( a, b ) ( ( a ) > ( b ) ? ( a ) : ( b ) )
+#define CLAMP( x, lo, hi ) MAX( MIN( hi, x ), lo )\
 
 struct cplane_s;
 
