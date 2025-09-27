@@ -706,6 +706,13 @@ char *Q_CleanStr( char *string ) {
 }
 
 
+const char *Q_StaticClean( const char *string ) {
+	static char buf[256];
+	Q_strncpyz( buf, string, sizeof( buf ) );
+	return Q_CleanStr( buf );
+}
+
+
 void QDECL Com_sprintf( char *dest, int size, const char *fmt, ...) {
 	int		len;
 	va_list		argptr;
