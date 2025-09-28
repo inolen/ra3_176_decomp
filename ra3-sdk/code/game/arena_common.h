@@ -49,4 +49,12 @@ enum {
 	TS_NUM_STATS,
 };
 
+extern char *arena_strings[AT_MAX_ARENA_TYPE + 1];
+extern char *protect[PM_MAX_PROTECT_MODE + 1];
+
+const char *arenatype_to_string( int type );
+char *encode_command( char *cmd, int key );
+int encode_int( int value, int key );
+int decode_int( int value, int key );
+
 #endif

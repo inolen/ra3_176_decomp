@@ -429,7 +429,7 @@ Kills all entities that would touch the proposed new positioning
 of ent.  Ent should be unlinked before calling this!
 =================
 */
-void G_KillBox (gentity_t *ent) {
+int G_KillBox (gentity_t *ent) {
 	int			i, num;
 	int			touch[MAX_GENTITIES];
 	gentity_t	*hit;
@@ -450,6 +450,7 @@ void G_KillBox (gentity_t *ent) {
 			100000, DAMAGE_NO_PROTECTION, MOD_TELEFRAG);
 	}
 
+	return 0;
 }
 
 //==============================================================================

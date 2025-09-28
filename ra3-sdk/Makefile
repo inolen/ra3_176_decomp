@@ -100,6 +100,7 @@ GAME_SRC = \
   $(SRCDIR)/game/ai_dmq3.c \
   $(SRCDIR)/game/ai_main.c \
   $(SRCDIR)/game/ai_team.c \
+  $(SRCDIR)/game/arena.c \
   $(SRCDIR)/game/bg_lib.c \
   $(SRCDIR)/game/bg_misc.c \
   $(SRCDIR)/game/bg_pmove.c \

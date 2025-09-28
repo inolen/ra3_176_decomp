@@ -7,6 +7,8 @@
 #include "bg_public.h"
 #include "g_public.h"
 
+#include "../sqlite/sqlite.h"
+
 //==================================================================
 
 // the "gameversion" client command will print this plus compile date
@@ -613,7 +615,7 @@ void SaveRegisteredItems( void );
 int G_ModelIndex( char *name );
 int		G_SoundIndex( char *name );
 void	G_TeamCommand( team_t team, char *cmd );
-void	G_KillBox (gentity_t *ent);
+int		G_KillBox (gentity_t *ent);
 gentity_t *G_Find (gentity_t *from, int fieldofs, const char *match);
 gentity_t *G_PickTarget (char *targetname);
 void	G_UseTargets (gentity_t *ent, gentity_t *activator);
@@ -809,6 +811,61 @@ qboolean G_BotConnect( int clientNum, qboolean restart );
 void Svcmd_AddBot_f( void );
 void Svcmd_BotList_f( void );
 void BotInterbreedEndMatch( void );
+
+//
+// arena.c
+//
+extern int idmap;
+
+gentity_t *SelectRandomArenaSpawnPoint( int arenaNum, int sortByDistance, int useNearHalf );
+
+void update_team_scores( int arenaNum );
+void update_hud_scores( int arenaNum );
+int count_players_in_arena( int arenaNum );
+int count_players_in_team( int teamNum );
+void send_teams_to_player( gentity_t *ent );
+void move_to_arena_request( gentity_t *ent, int arenaNum );
+
+void G_JoinTeam( gentity_t *ent, int teamNum );
+void G_ResetTeamName( gentity_t *ent );
+void G_LeaveTeam( gentity_t *ent );
+char *get_arena_name( int arenaNum );
+
+void SelectTeamMessage( gentity_t *ent );
+void track_next( gentity_t *ent );
+void track_prev( gentity_t *ent );
+void change_omode( gentity_t *ent );
+void set_sessionteam_and_skin( gentity_t *ent, team_t sessionTeam );
+void arena_spawn( gentity_t *ent );
+void show_string( const char *text, int arenaNum );
+
+void set_telefrag_dir( gentity_t *ent, gentity_t *other );
+void telefrag_bounce_client( gentity_t *ent );
+
+void arena_think_all();
+void set_arena_configstring( int arenaNum );
+void arena_init();
+
+const char *WeapShort( int id );
+
+void Cmd_MovetoArena_f( gentity_t *ent );
+void Cmd_AdminChangeMap_f( gentity_t *ent );
+void Cmd_RA3Vote_f( gentity_t *ent, int vote );
+void Cmd_Propose_f( gentity_t *ent );
+void Cmd_AdminArena_f( gentity_t *ent );
+void Cmd_PLUpdate_f( gentity_t *ent );
+void Cmd_JoinTeam_f( gentity_t *ent );
+void Cmd_LeaveTeam_f( gentity_t *ent );
+void Cmd_LeaveArena_f( gentity_t *ent );
+void Cmd_UpdStats_f( gentity_t *ent );
+void Cmd_SpecWho_f( gentity_t *ent );
+void Cmd_SpecRevoke_f( gentity_t *ent );
+void Cmd_SpecInvite_f( gentity_t *ent );
+void Cmd_CompReady_f( gentity_t *ent );
+#ifndef Q3_VM
+void Cmd_Aliases_f( gentity_t *ent );
+#endif
+void Cmd_Players_f( gentity_t *ent );
 
 // ai_main.c
 
