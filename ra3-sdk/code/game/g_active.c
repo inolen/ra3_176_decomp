@@ -524,7 +524,7 @@ ClientThink
 This will be called once for each client frame, which will
 usually be a couple times for each server frame on fast clients.
 
-If "g_syncronousClients 1" is set, this will be called exactly
+If "g_synchronousClients 1" is set, this will be called exactly
 once for each server frame, which makes for smooth demo recording.
 ==============
 */
@@ -688,12 +688,14 @@ void ClientThink_real( gentity_t *ent ) {
 	if ( client->ps.stats[STAT_HEALTH] <= 0 ) {
 		// wait for the attack button to be pressed
 		if ( level.time > client->respawnTime ) {
+#if 0
 			// forcerespawn is to prevent users from waiting out powerups
 			if ( g_forcerespawn.integer > 0 && 
 				( level.time - client->respawnTime ) > g_forcerespawn.integer * 1000 ) {
 				respawn( ent );
 				return;
 			}
+#endif
 		
 			// pressing attack or use is the normal respawn method
 			if ( ucmd->buttons & ( BUTTON_ATTACK | BUTTON_USE_HOLDABLE ) ) {
@@ -724,14 +726,14 @@ void ClientThink( int clientNum ) {
 	// phone jack if they don't get any for a while
 	ent->client->lastCmdTime = level.time;
 
-	if ( !g_syncronousClients.integer ) {
+	if ( !g_synchronousClients.integer ) {
 		ClientThink_real( ent );
 	}
 }
 
 
 void G_RunClient( gentity_t *ent ) {
-	if ( !g_syncronousClients.integer ) {
+	if ( !g_synchronousClients.integer ) {
 		return;
 	}
 	ent->client->pers.cmd.serverTime = level.time;
@@ -812,7 +814,7 @@ void ClientEndFrame( gentity_t *ent ) {
 
 	// save network bandwidth
 #if 0
-	if ( !g_syncronousClients->integer && ent->client->ps.pm_type == PM_NORMAL ) {
+	if ( !g_synchronousClients->integer && ent->client->ps.pm_type == PM_NORMAL ) {
 		// FIXME: this must change eventually for non-sync demo recording
 		VectorClear( ent->client->ps.viewangles );
 	}

@@ -12,6 +12,7 @@ typedef struct {
 	int			cvarFlags;
 	int			modificationCount;  // for tracking changes
 	qboolean	trackChange;	// track this variable, and announce if changed
+	pthread_mutex_t	mutex;
 } cvarTable_t;
 
 gentity_t		g_entities[MAX_GENTITIES];
@@ -22,6 +23,7 @@ vmCvar_t	g_dmflags;
 vmCvar_t	g_fraglimit;
 vmCvar_t	g_timelimit;
 vmCvar_t	g_capturelimit;
+vmCvar_t	g_location;
 vmCvar_t	g_friendlyFire;
 vmCvar_t	g_password;
 vmCvar_t	g_needpass;
@@ -40,7 +42,7 @@ vmCvar_t	g_debugDamage;
 vmCvar_t	g_debugAlloc;
 vmCvar_t	g_weaponRespawn;
 vmCvar_t	g_motd;
-vmCvar_t	g_syncronousClients;
+vmCvar_t	g_synchronousClients;
 vmCvar_t	g_warmup;
 vmCvar_t	g_doWarmup;
 vmCvar_t	g_restarted;
@@ -52,34 +54,62 @@ vmCvar_t	g_podiumDrop;
 vmCvar_t	g_allowVote;
 vmCvar_t	g_teamAutoJoin;
 vmCvar_t	g_teamForceBalance;
+#ifdef Q3_VM
 vmCvar_t	g_banIPs;
+#endif
 vmCvar_t	g_filterBan;
+vmCvar_t	g_smoothClients;
+vmCvar_t	pmove_fixed;
+vmCvar_t	pmove_msec;
 
+vmCvar_t	g_version;
+vmCvar_t	g_voteInterval;
+vmCvar_t	g_compmodeBlackout;
+vmCvar_t	g_timeLeft;
+vmCvar_t	g_lightningDamage;
+vmCvar_t	net_port;
+vmCvar_t	g_chatFlood;
+vmCvar_t	g_trackPlayers;
+vmCvar_t	g_trackStats;
+vmCvar_t	g_statsThreshold;
+vmCvar_t	g_rotateLogs;
+vmCvar_t	g_funMode;
+vmCvar_t	g_autoBalance;
+vmCvar_t	g_timeouts;
+vmCvar_t	g_httpd;
+vmCvar_t	fs_homepath;
+vmCvar_t	fs_game;
+vmCvar_t	g_votePercent;
+vmCvar_t	g_truePing;
+vmCvar_t	sv_fps;
+vmCvar_t	sv_punkbuster;
+vmCvar_t	pb_guids[64];
 
 cvarTable_t		gameCvarTable[] = {
 	// don't override the cheat state set by the system
 	{ &g_cheats, "sv_cheats", "", 0, 0, qfalse },
 
 	// noset vars
-	{ NULL, "gamename", GAMEVERSION , CVAR_SERVERINFO | CVAR_ROM, 0, qfalse  },
-	{ NULL, "gamedate", __DATE__ , CVAR_ROM, 0, qfalse  },
+	{ NULL, "gamename", "arena", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse  },
+	{ NULL, "gamedate", "Apr  1 2004", CVAR_ROM, 0, qfalse  },
 	{ &g_restarted, "g_restarted", "0", CVAR_ROM, 0, qfalse  },
 	{ NULL, "sv_mapname", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse  },
 
 	// latched vars
-	{ &g_gametype, "g_gametype", "0", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse  },
+	{ &g_gametype, "g_gametype", "8", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse  },
 
 	{ &g_maxclients, "sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
 	{ &g_maxGameClients, "g_maxGameClients", "0", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
 
 	// change anytime vars
 	{ &g_dmflags, "dmflags", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue  },
-	{ &g_fraglimit, "fraglimit", "20", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
+	{ &g_fraglimit, "fraglimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_ROM | CVAR_NORESTART, 0, qtrue },
 	{ &g_timelimit, "timelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
 	{ &g_capturelimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
 
-	{ &g_syncronousClients, "g_syncronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },
+	{ &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },
 
+	{ &g_location, "location", "0", CVAR_SYSTEMINFO, 0, qfalse },
 	{ &g_friendlyFire, "g_friendlyFire", "1", CVAR_ARCHIVE, 0, qtrue  },
 
 	{ &g_teamAutoJoin, "g_teamAutoJoin", "0", CVAR_ARCHIVE  },
@@ -92,7 +122,9 @@ cvarTable_t		gameCvarTable[] = {
 
 	{ &g_password, "g_password", "", CVAR_USERINFO, 0, qfalse  },
 
+#ifdef Q3_VM
 	{ &g_banIPs, "g_banIPs", "", CVAR_ARCHIVE, 0, qfalse  },
+#endif
 	{ &g_filterBan, "g_filterBan", "1", CVAR_ARCHIVE, 0, qfalse  },
 
 	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
@@ -115,7 +147,98 @@ cvarTable_t		gameCvarTable[] = {
 	{ &g_podiumDist, "g_podiumDist", "80", 0, 0, qfalse },
 	{ &g_podiumDrop, "g_podiumDrop", "70", 0, 0, qfalse },
 
-	{ &g_allowVote, "g_allowVote", "1", 0, 0, qfalse }
+	{ &g_allowVote, "g_allowVote", "1", CVAR_ARCHIVE, 0, qfalse },
+
+	{ &g_smoothClients, "g_smoothClients", "1", 0, 0, qfalse },
+	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO, 0, qfalse },
+	{ &pmove_msec, "pmove_msec", "8", CVAR_SYSTEMINFO, 0, qfalse },
+
+	{ &g_version, "g_version", "RA3 1.76 Apr  1 2004 18:00:55", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
+	{ &g_voteInterval, "g_voteInterval", "120", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_compmodeBlackout, "g_compmodeBlackout", "1", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_timeLeft, "g_timeLeft", "", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
+	{ &g_lightningDamage, "g_lightningDamage", "0.875", CVAR_ARCHIVE, 0, qfalse },
+	{ &net_port, "net_port", "0", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_chatFlood, "g_chatFlood", "2:2:0", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_trackPlayers, "g_trackPlayers", "0", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_trackStats, "g_trackStats", "0", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_statsThreshold, "g_statsThreshold", "0", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_rotateLogs, "g_rotateLogs", "0", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_funMode, "g_funMode", "0", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_autoBalance, "g_autoBalance", "0", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_timeouts, "g_timeouts", "2:120", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_httpd, "g_httpd", "0", CVAR_ARCHIVE, 0, qfalse },
+	{ &fs_homepath, "fs_homepath", "", CVAR_ARCHIVE, 0, qfalse },
+	{ &fs_game, "fs_game", "arena", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_votePercent, "g_votePercent", "60", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_truePing, "g_truePing", "1", CVAR_ARCHIVE, 0, qtrue },
+	{ &sv_fps, "sv_fps", "20", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qfalse },
+
+	{ &sv_punkbuster, "sv_punkbuster", "0", 0, 0, qtrue },
+	{ &pb_guids[0], "guid_sv_00", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[1], "guid_sv_01", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[2], "guid_sv_02", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[3], "guid_sv_03", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[4], "guid_sv_04", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[5], "guid_sv_05", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[6], "guid_sv_06", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[7], "guid_sv_07", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[8], "guid_sv_08", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[9], "guid_sv_09", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[10], "guid_sv_10", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[11], "guid_sv_11", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[12], "guid_sv_12", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[13], "guid_sv_13", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[14], "guid_sv_14", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[15], "guid_sv_15", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[16], "guid_sv_16", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[17], "guid_sv_17", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[18], "guid_sv_18", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[19], "guid_sv_19", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[20], "guid_sv_20", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[21], "guid_sv_21", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[22], "guid_sv_22", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[23], "guid_sv_23", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[24], "guid_sv_24", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[25], "guid_sv_25", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[26], "guid_sv_26", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[27], "guid_sv_27", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[28], "guid_sv_28", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[29], "guid_sv_29", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[30], "guid_sv_30", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[31], "guid_sv_31", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[32], "guid_sv_32", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[33], "guid_sv_33", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[34], "guid_sv_34", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[35], "guid_sv_35", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[36], "guid_sv_36", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[37], "guid_sv_37", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[38], "guid_sv_38", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[39], "guid_sv_39", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[40], "guid_sv_40", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[41], "guid_sv_41", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[42], "guid_sv_42", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[43], "guid_sv_43", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[44], "guid_sv_44", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[45], "guid_sv_45", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[46], "guid_sv_46", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[47], "guid_sv_47", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[48], "guid_sv_48", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[49], "guid_sv_49", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[50], "guid_sv_50", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[51], "guid_sv_51", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[52], "guid_sv_52", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[53], "guid_sv_53", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[54], "guid_sv_54", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[55], "guid_sv_55", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[56], "guid_sv_56", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[57], "guid_sv_57", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[58], "guid_sv_58", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[59], "guid_sv_59", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[60], "guid_sv_60", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[61], "guid_sv_61", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[62], "guid_sv_62", "EmptySlot", CVAR_ROM, 0, qfalse },
+	{ &pb_guids[63], "guid_sv_63", "EmptySlot", CVAR_ROM, 0, qfalse }
 };
 
 int		gameCvarTableSize = sizeof( gameCvarTable ) / sizeof( gameCvarTable[0] );
@@ -1126,8 +1249,10 @@ can see the last frag.
 =================
 */
 void CheckExitRules( void ) {
+#if 0
 	int			i;
 	gclient_t	*cl;
+#endif
 
 	// if at the intermission, wait for all non-bots to
 	// signal ready, then go to next level
@@ -1161,6 +1286,7 @@ void CheckExitRules( void ) {
 		return;
 	}
 
+#if 0
 	if ( g_gametype.integer != GT_CTF && g_fraglimit.integer ) {
 		if ( level.teamScores[TEAM_RED] >= g_fraglimit.integer ) {
 			trap_SendServerCommand( -1, "print \"Red hit the fraglimit.\n\"" );
@@ -1191,7 +1317,9 @@ void CheckExitRules( void ) {
 			}
 		}
 	}
+#endif
 
+#if 0
 	if ( g_gametype.integer == GT_CTF && g_capturelimit.integer ) {
 
 		if ( level.teamScores[TEAM_RED] >= g_capturelimit.integer ) {
@@ -1206,6 +1334,7 @@ void CheckExitRules( void ) {
 			return;
 		}
 	}
+#endif
 }
 
 

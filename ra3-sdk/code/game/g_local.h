@@ -7,12 +7,13 @@
 #include "bg_public.h"
 #include "g_public.h"
 
+#include <pthread.h>
 #include "../sqlite/sqlite.h"
 
 //==================================================================
 
 // the "gameversion" client command will print this plus compile date
-#define	GAMEVERSION	"baseq3"
+#define	GAMEVERSION	"RA3 1.76"
 
 #define BODY_QUEUE_SIZE		8
 
@@ -907,6 +908,7 @@ extern	vmCvar_t	g_dmflags;
 extern	vmCvar_t	g_fraglimit;
 extern	vmCvar_t	g_timelimit;
 extern	vmCvar_t	g_capturelimit;
+extern	vmCvar_t	g_location;
 extern	vmCvar_t	g_friendlyFire;
 extern	vmCvar_t	g_password;
 extern	vmCvar_t	g_needpass;
@@ -920,7 +922,7 @@ extern	vmCvar_t	g_debugMove;
 extern	vmCvar_t	g_debugAlloc;
 extern	vmCvar_t	g_debugDamage;
 extern	vmCvar_t	g_weaponRespawn;
-extern	vmCvar_t	g_syncronousClients;
+extern	vmCvar_t	g_synchronousClients;
 extern	vmCvar_t	g_motd;
 extern	vmCvar_t	g_warmup;
 extern	vmCvar_t	g_doWarmup;
@@ -928,8 +930,36 @@ extern	vmCvar_t	g_blood;
 extern	vmCvar_t	g_allowVote;
 extern	vmCvar_t	g_teamAutoJoin;
 extern	vmCvar_t	g_teamForceBalance;
+#ifdef Q3_VM
 extern	vmCvar_t	g_banIPs;
+#endif
 extern	vmCvar_t	g_filterBan;
+extern	vmCvar_t	g_smoothClients;
+extern	vmCvar_t	pmove_fixed;
+extern	vmCvar_t	pmove_msec;
+
+extern	vmCvar_t	g_version;
+extern	vmCvar_t	g_voteInterval;
+extern	vmCvar_t	g_compmodeBlackout;
+extern	vmCvar_t	g_timeLeft;
+extern	vmCvar_t	g_lightningDamage;
+extern	vmCvar_t	net_port;
+extern	vmCvar_t	g_chatFlood;
+extern	vmCvar_t	g_trackPlayers;
+extern	vmCvar_t	g_trackStats;
+extern	vmCvar_t	g_statsThreshold;
+extern	vmCvar_t	g_rotateLogs;
+extern	vmCvar_t	g_funMode;
+extern	vmCvar_t	g_autoBalance;
+extern	vmCvar_t	g_timeouts;
+extern	vmCvar_t	g_httpd;
+extern	vmCvar_t	fs_homepath;
+extern	vmCvar_t	fs_game;
+extern	vmCvar_t	g_votePercent;
+extern	vmCvar_t	g_truePing;
+extern	vmCvar_t	sv_fps;
+extern	vmCvar_t	sv_punkbuster;
+extern	vmCvar_t	pb_guids[64];
 
 void	trap_Printf( const char *fmt );
 void	trap_Error( const char *fmt );
