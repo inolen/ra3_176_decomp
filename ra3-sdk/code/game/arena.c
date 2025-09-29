@@ -1,8 +1,6 @@
 #include "g_local.h"
 
 // FIXME temporary stubs
-extern int votetries_setting;
-
 extern void CountReadyClients( int *param_1, int *param_2, int *param_3, int *param_4, int arenaNum );
 extern void SetClientReadyMasks( int readyMask, int arenaNum );
 extern void ClearClientReady( int arenaNum );
@@ -20,12 +18,6 @@ extern void G_NewTeamCaptain( gentity_t *ent );
 
 extern void send_end_of_round_stats( int arenaNum );
 extern void G_SendStatsupdate( gentity_t *ent, int unknown );
-
-extern void set_config(int firstArena, int lastArena);
-extern const char *current_mapname();
-extern void load_config(int numArenas);
-extern const char *get_next_map(const char *map);
-extern void load_motd();
 //
 
 int trueframetime = 50;

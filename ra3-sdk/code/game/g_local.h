@@ -868,6 +868,17 @@ void Cmd_Aliases_f( gentity_t *ent );
 #endif
 void Cmd_Players_f( gentity_t *ent );
 
+//
+// arenacfg.c
+//
+extern int votetries_setting;
+
+void set_config(int firstArena, int lastArena);
+const char *current_mapname();
+void load_config(int numArenas);
+const char *get_next_map(const char *map);
+void load_motd();
+
 // ai_main.c
 
 //some maxs
