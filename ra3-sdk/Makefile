@@ -102,6 +102,7 @@ GAME_SRC = \
   $(SRCDIR)/game/ai_team.c \
   $(SRCDIR)/game/arena.c \
   $(SRCDIR)/game/arenacfg.c \
+  $(SRCDIR)/game/arena_common.c \
   $(SRCDIR)/game/bg_lib.c \
   $(SRCDIR)/game/bg_misc.c \
   $(SRCDIR)/game/bg_pmove.c \
