@@ -188,8 +188,9 @@ loop:	SWAPINIT(a, es);
 
 //==================================================================================
 
-
 // this file is excluded from release builds because of intrinsics
+
+#if !defined ( _MSC_VER ) && ! defined ( __linux__ )
 
 size_t strlen( const char *string ) {
 	const char	*s;
@@ -264,8 +265,6 @@ char *strstr( const char *string, const char *strCharSet ) {
 	return (char *)0;
 }
 
-#if !defined ( _MSC_VER ) && ! defined ( __linux__ )
-
 int tolower( int c ) {
 	if ( c >= 'A' && c <= 'Z' ) {
 		c += 'a' - 'A';
@@ -282,7 +281,6 @@ int toupper( int c ) {
 }
 
 #endif
-//#ifndef _MSC_VER
 
 void *memmove( void *dest, const void *src, size_t count ) {
 	int		i;
@@ -587,13 +585,11 @@ double atan2( double y, double x ) {
 	return base + dir * i * ( M_PI/2048); 
 }
 
-
-#endif
-
 double tan( double x ) {
 	return sin(x) / cos(x);
 }
 
+#endif
 
 static int randSeed = 0;
 
@@ -677,7 +673,7 @@ double _atof( const char **stringPtr ) {
 	const char	*string;
 	float sign;
 	float value;
-	int		c;
+	int		c = '0';
 
 	string = *stringPtr;
 

@@ -83,6 +83,7 @@ SECTIONS
     . = 0x000781ac - 0x0001da34; */game/arena.o                    (.text .text.*);
     . = 0x00081fd0 - 0x0001da34; */game/arenacfg.o                 (.text .text.*);
     . = 0x0008452c - 0x0001da34; */game/arena_common.o             (.text .text.*);
+    . = 0x000846b8 - 0x0001da34; */game/bg_lib.o                   (.text .text.*);
 
     *(.text .text.*);
   } :text =0x90909090
@@ -109,6 +110,7 @@ SECTIONS
     . = 0x000cc4e0 - 0x000bdf40; */game/arena.o        (.rodata);
     . = 0x000cda80 - 0x000bdf40; */game/arenacfg.o     (.rodata);
     . = 0x000cdea6 - 0x000bdf40; */game/arena_common.o (.rodata);
+    . = 0x000cdf20 - 0x000bdf40; */game/bg_lib.o       (.rodata);
 
     *(.rodata);
   } :text
@@ -140,6 +142,7 @@ SECTIONS
     . = 0x000db1c0 - 0x000d76e0; */game/arena.o                    (.data .data.*);
     . = 0x000db200 - 0x000d76e0; */game/arenacfg.o                 (.data .data.*);
     . = 0x000db258 - 0x000d76e0; */game/arena_common.o             (.data .data.*);
+    . = 0x000db27c - 0x000d76e0; */game/bg_lib.o                   (.data .data.*);
 
     *(.data .data.*);
   } :data
@@ -195,6 +198,7 @@ SECTIONS
     . = 0x000e2d60 - 0x000dfc20; */game/arena.o                    (.bss);
     . = 0x000e2d60 - 0x000dfc20; */game/arenacfg.o                 (.bss);
     . = 0x000e35e0 - 0x000dfc20; */game/arena_common.o             (.bss);
+    . = 0x000e3660 - 0x000dfc20; */game/bg_lib.o                   (.bss);
 
     *(.bss);
     *(COMMON);
