@@ -52,12 +52,11 @@ void UpdateTournamentInfo( void ) {
 		Com_sprintf( msg, sizeof(msg), "postgame %i %i 0 0 0 0 0 0", level.numNonSpectatorClients, playerClientNum );
 	}
 	else {
-		//if( player->client->ps.persistant[PERS_ACCURACY_SHOTS] ) {
-		//	accuracy = player->client->ps.persistant[PERS_ACCURACY_HITS] * 100 / player->client->ps.persistant[PERS_ACCURACY_SHOTS];
-		//}
-		//else {
+		if ( player->client->accuracy_shots ) {
+			accuracy = player->client->accuracy_hits * 100 / player->client->accuracy_shots;
+		} else {
 			accuracy = 0;
-		//}
+		}
 		perfect = ( level.clients[playerClientNum].ps.persistant[PERS_RANK] == 0 && player->client->ps.persistant[PERS_KILLED] == 0 ) ? 1 : 0;
 		Com_sprintf( msg, sizeof(msg), "postgame %i %i %i %i %i %i %i %i", level.numNonSpectatorClients, playerClientNum, accuracy,
 			player->client->ps.persistant[PERS_IMPRESSIVE_COUNT], player->client->ps.persistant[PERS_EXCELLENT_COUNT],
