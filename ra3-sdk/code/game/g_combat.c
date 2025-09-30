@@ -4,6 +4,14 @@
 
 #include "g_local.h"
 
+// FIXME stubs
+gentity_t *LaunchItem( gitem_t *item, vec3_t origin, vec3_t velocity );
+
+void G_SetStat( gentity_t *ent, int stat, int value );
+void G_SendEorSingle( gentity_t *ent );
+
+void G_UnTimeShiftClient( gentity_t *client );
+//
 
 /*
 ============
@@ -21,8 +29,11 @@ void AddScore( gentity_t *ent, int score ) {
 		return;
 	}
 	ent->client->ps.persistant[PERS_SCORE] += score;
-	if (g_gametype.integer == GT_TEAM)
-		level.teamScores[ ent->client->ps.persistant[PERS_TEAM] ] += score;
+
+	if ( level.arenas[ent->client->ps.persistant[PERS_ARENA]].settings.type == AT_REDROVER ) {
+		update_hud_scores( ent->client->ps.persistant[PERS_ARENA] );
+	}
+
 	CalculateRanks();
 }
 
@@ -182,6 +193,8 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	int			killer;
 	int			i;
 	char		*killerName, *obit;
+	gentity_t	*tent;
+	vec3_t		radiusDir;
 
 	if ( self->client->ps.pm_type == PM_DEAD ) {
 		return;
@@ -191,8 +204,11 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		return;
 	}
 
-	if (self->client && self->client->hook)
-		Weapon_HookFree(self->client->hook);
+	G_UnTimeShiftClient( self );
+
+	if ( self->client && self->client->hook ) {
+		Weapon_HookFree( self->client->hook );
+	}
 
 	self->client->ps.pm_type = PM_DEAD;
 
@@ -219,9 +235,9 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		obit = modNames[ meansOfDeath ];
 	}
 
-	G_LogPrintf("Kill: %i %i %i: %s killed %s by %s\n", 
-		killer, self->s.number, meansOfDeath, killerName, 
-		self->client->pers.netname, obit );
+	G_LogPrintf("Kill: %i %i %i %d: %s killed %s by %s\n",
+	  killer, self->s.number, meansOfDeath, self->client->ps.persistant[PERS_ARENA],
+	  killerName, self->client->pers.netname, obit );
 
 	// broadcast the death event to everyone
 	ent = G_TempEntity( self->r.currentOrigin, EV_OBITUARY );
@@ -234,33 +250,72 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
 	self->client->ps.persistant[PERS_KILLED]++;
 
+	G_SetStat( self, TS_DEATHS, 1 );
+
+	// send stats about killer to self
+	self->client->pers.killerStats.send = 1;
+
+	if ( attacker && attacker->client ) {
+		attacker->client->pers.lastDamage.victimNum = self->client->ps.clientNum;
+	}
+
+	if (attacker && attacker->client) {
+		self->client->pers.killerStats.clientNum = attacker->client->ps.clientNum;
+		self->client->pers.killerStats.health = attacker->client->ps.stats[STAT_HEALTH];
+		self->client->pers.killerStats.armor = attacker->client->ps.stats[STAT_ARMOR];
+		self->client->pers.killerStats.mod = meansOfDeath;
+
+		if (!level.arenas[(self->client->ps).persistant[PERS_ARENA]].settings.competitionmode) {
+			trap_SendServerCommand(self - g_entities, va("print \"%s^7 had %d health and %d armor left\n\"",
+			  attacker->client->pers.netname, attacker->client->ps.stats[STAT_HEALTH],
+			  attacker->client->ps.stats[STAT_ARMOR]));
+			G_SendEorSingle(self);
+		}
+	}
+
 	if (attacker && attacker->client) {
 		if ( attacker == self || OnSameTeam (self, attacker ) ) {
 			AddScore( attacker, -1 );
 		} else {
 			AddScore( attacker, 1 );
+			G_SetStat( attacker, TS_KILLS, 1 );
 
-			if( meansOfDeath == MOD_GAUNTLET ) {
+			attacker->client->pers.combatStats[self->client->ps.clientNum].meansOfDeath = meansOfDeath;
+			self->client->pers.combatStats[attacker->client->ps.clientNum].killedMe = 1;
+
+			if ( level.arenas[self->client->ps.persistant[PERS_ARENA]].settings.type == AT_REDROVER ) {
+				AddScore( self, -1 );
+			}
+
+			if ( meansOfDeath == MOD_GAUNTLET ) {
+				// play humiliation on player
 				attacker->client->ps.persistant[PERS_GAUNTLET_FRAG_COUNT]++;
 
 				// add the sprite over the player's head
-				attacker->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET );
+				attacker->client->ps.eFlags &= ~( EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET |
+				                                  EF_AWARD_HOLYSHIT | EF_AWARD_ACCURACY | EF_AWARD_CAP );
 				attacker->client->ps.eFlags |= EF_AWARD_GAUNTLET;
 				attacker->client->rewardTime = level.time + REWARD_SPRITE_TIME;
+
+				// also play humiliation on target
+				self->client->ps.persistant[PERS_PLAYEREVENTS] ^= PLAYEREVENT_GAUNTLETREWARD;
 			}
 
 			// check for two kills in a short amount of time
 			// if this is close enough to the last kill, give a reward sound
-			if ( level.time - attacker->client->lastKillTime < CARNAGE_REWARD_TIME ) {
+			if ( level.time - attacker->client->lastKillTime < CARNAGE_REWARD_TIME &&
+			     level.arenas[attacker->client->ps.persistant[PERS_ARENA]].state != ROUND_WARMUP ) {
+				// play excellent on player
 				attacker->client->ps.persistant[PERS_EXCELLENT_COUNT]++;
 
 				// add the sprite over the player's head
-				attacker->client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET );
+				attacker->client->ps.eFlags &= ~( EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET |
+				                                  EF_AWARD_HOLYSHIT | EF_AWARD_ACCURACY | EF_AWARD_CAP );
 				attacker->client->ps.eFlags |= EF_AWARD_EXCELLENT;
 				attacker->client->rewardTime = level.time + REWARD_SPRITE_TIME;
 			}
-			attacker->client->lastKillTime = level.time;
 
+			attacker->client->lastKillTime = level.time;
 		}
 	} else {
 		AddScore( self, -1 );
@@ -272,9 +327,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	// if client is in a nodrop area, don't drop anything (but return CTF flags!)
 	contents = trap_PointContents( self->r.currentOrigin, -1 );
 	if ( !( contents & CONTENTS_NODROP ) ) {
-		TossClientItems( self );
-	}
-	else {
+	} else {
 		if ( self->client->ps.powerups[PW_REDFLAG] ) {
 			Team_ReturnFlag(TEAM_RED);
 		}
@@ -324,6 +377,16 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 	// remove powerups
 	memset( self->client->ps.powerups, 0, sizeof(self->client->ps.powerups) );
 
+	if (level.arenas[(self->client->ps).persistant[PERS_ARENA]].settings.excessive) {
+		tent = G_TempEntity( self->r.currentOrigin, EV_MISSILE_HIT );
+		tent->s.otherEntityNum = self->s.number;
+		VectorSet(radiusDir, 0.0f, 1.0f, 0.0f);
+		tent->s.eventParm = DirToByte(radiusDir);
+		tent->s.weapon = WP_ROCKET_LAUNCHER;
+		G_RadiusDamage( self->r.currentOrigin, attacker, 100, 100, self, MOD_UNKNOWN );
+		self->health = GIB_HEALTH - 1;
+	}
+
 	// never gib in a nodrop
 	if ( self->health <= GIB_HEALTH && !(contents & CONTENTS_NODROP) && g_blood.integer ) {
 		// gib death
@@ -356,7 +419,8 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		self->client->ps.torsoAnim = 
 			( ( self->client->ps.torsoAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT ) | anim;
 
-		G_AddEvent( self, EV_DEATH1 + 1, killer );
+		// FIXME odd that this no longer cycles death animations
+		G_AddEvent( self, EV_DEATH2, killer );
 
 		// the body can still be gibbed
 		self->die = body_die;
@@ -374,11 +438,11 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 CheckArmor
 ================
 */
-int CheckArmor (gentity_t *ent, int damage, int dflags)
-{
+int CheckArmor( gentity_t *ent, int damage, int dflags, gentity_t *attacker ) {
 	gclient_t	*client;
 	int			save;
 	int			count;
+	int			reduce;
 
 	if (!damage)
 		return 0;
@@ -391,16 +455,31 @@ int CheckArmor (gentity_t *ent, int damage, int dflags)
 	if (dflags & DAMAGE_NO_ARMOR)
 		return 0;
 
-	// armor
+	// calculate how much damage is tanked by the armor
 	count = client->ps.stats[STAT_ARMOR];
 	save = ceil( damage * ARMOR_PROTECTION );
-	if (save >= count)
+
+	if ( save >= count ) {
 		save = count;
+	}
 
-	if (!save)
+	if ( !save ) {
 		return 0;
+	}
 
-	client->ps.stats[STAT_ARMOR] -= save;
+	// calculate how much the armor should be reduced
+	reduce = save;
+
+	if ( OnSameTeam( ent, attacker ) && !( dflags & DAMAGE_NO_PROTECTION ) ) {
+		if ( level.arenas[client->ps.persistant[PERS_ARENA]].settings.armorprotect == PM_SELF_AND_TEAM ) {
+			reduce = 0;
+		} else if ( level.arenas[client->ps.persistant[PERS_ARENA]].settings.armorprotect == PM_TEAM &&
+		            ent != attacker ) {
+			reduce = 0;
+		}
+	}
+
+	client->ps.stats[STAT_ARMOR] -= reduce;
 
 	return save;
 }
@@ -437,13 +516,16 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	int			save;
 	int			asave;
 	int			knockback;
+	int			max;
+	int			excessive;
+
+	excessive = attacker && attacker->client && level.arenas[attacker->client->ps.persistant[PERS_ARENA]].settings.excessive;
 
 	if (!targ->takedamage) {
 		return;
 	}
 
-	// the intermission has allready been qualified for, so don't
-	// allow any extra scoring
+	// the intermission has already been qualified for, so don't allow any extra scoring
 	if ( level.intermissionQueued ) {
 		return;
 	}
@@ -451,6 +533,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	if ( !inflictor ) {
 		inflictor = &g_entities[ENTITYNUM_WORLD];
 	}
+
 	if ( !attacker ) {
 		attacker = &g_entities[ENTITYNUM_WORLD];
 	}
@@ -463,10 +546,10 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		return;
 	}
 
-	// reduce damage by the attacker's handicap value
-	// unless they are rocket jumping
+	// reduce damage by the attacker's handicap value unless they are rocket jumping
 	if ( attacker->client && attacker != targ ) {
-		damage = damage * attacker->client->ps.stats[STAT_MAX_HEALTH] / 100;
+		max = attacker->client->ps.stats[STAT_MAX_HEALTH];
+		damage = damage * max / 100;
 	}
 
 	client = targ->client;
@@ -483,13 +566,27 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		VectorNormalize(dir);
 	}
 
+	// apply knockback proportional to the damage
 	knockback = damage;
-	if ( knockback > 200 ) {
-		knockback = 200;
+
+	if ( excessive ) {
+		if ( !strcmp( inflictor->classname, "grenade" ) ) {
+			knockback *= 4;
+		} else if ( !strcmp( inflictor->classname, "plasma" ) ) {
+			knockback += 100;
+		} else if ( !strcmp( inflictor->classname, "bfg" ) ) {
+			knockback += 50;
+		}
+	} else {
+		if ( knockback > 200 ) {
+			knockback = 200;
+		}
 	}
+
 	if ( targ->flags & FL_NO_KNOCKBACK ) {
 		knockback = 0;
 	}
+
 	if ( dflags & DAMAGE_NO_KNOCKBACK ) {
 		knockback = 0;
 	}
@@ -504,18 +601,22 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		VectorScale (dir, g_knockback.value * (float)knockback / mass, kvel);
 		VectorAdd (targ->client->ps.velocity, kvel, targ->client->ps.velocity);
 
-		// set the timer so that the other client can't cancel
-		// out the movement immediately
+		// set the timer so that the other client can't cancel out the movement immediately
 		if ( !targ->client->ps.pm_time ) {
 			int		t;
 
 			t = knockback * 2;
+
 			if ( t < 50 ) {
 				t = 50;
 			}
+
 			if ( t > 200 ) {
-				t = 200;
+				if ( !excessive ) {
+					t = 200;
+				}
 			}
+
 			targ->client->ps.pm_time = t;
 			targ->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
 		}
@@ -523,7 +624,6 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
 	// check for completely getting out of the damage
 	if ( !(dflags & DAMAGE_NO_PROTECTION) ) {
-
 		// if TF_NO_FRIENDLY_FIRE is set, don't do damage to the target
 		// if the attacker was on the same team
 		if ( targ != attacker && OnSameTeam (targ, attacker)  ) {
@@ -553,12 +653,26 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		if ( OnSameTeam( targ, attacker ) ) {
 			attacker->client->ps.persistant[PERS_HITS] -= damage;
 		} else {
+			int i;
+
 			attacker->client->ps.persistant[PERS_HITS] += damage;
+
+			for ( i = 0; i < MAX_CLIENTS; i++ ) {
+				if (g_entities[i].inuse == qfalse ||
+				    g_entities[i].client == NULL ||
+				    g_entities[i].client->pers.connected != CON_CONNECTED ||
+				    g_entities[i].client->sess.sessionTeam != TEAM_SPECTATOR ||
+				    ( g_entities[i].client->ps.pm_flags & PMF_FOLLOW ) == 0 ||
+				    g_entities[i].client->sess.spectatorClient != attacker->s.number) {
+					continue;
+				}
+
+				g_entities[i].client->ps.persistant[PERS_HITS] += damage;
+			}
 		}
 	}
 
 	// always give half damage if hurting self
-	// calculated after knockback, so rocket jumping works
 	if ( targ == attacker) {
 		damage *= 0.5;
 	}
@@ -570,12 +684,58 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	save = 0;
 
 	// save some from armor
-	asave = CheckArmor (targ, take, dflags);
+	asave = CheckArmor( targ, take, dflags, attacker );
 	take -= asave;
 
+	if ( OnSameTeam( targ, attacker ) && !( dflags & DAMAGE_NO_PROTECTION ) ) {
+		if ( level.arenas[targ->client->ps.persistant[PERS_ARENA]].settings.healthprotect == PM_SELF_AND_TEAM ) {
+			return;
+		}
+		if ( level.arenas[targ->client->ps.persistant[PERS_ARENA]].settings.healthprotect == PM_TEAM && targ != attacker ) {
+			return;
+		}
+	}
+
 	if ( g_debugDamage.integer ) {
-		G_Printf( "%i: client:%i health:%i damage:%i armor:%i\n", level.time, targ->s.number,
-			targ->health, take, asave );
+		G_Printf( "%i: client:%i health:%i damage:%i armor:%i\n", level.time, targ->s.number, targ->health, take, asave );
+	}
+
+	if ( g_funMode.integer && targ && targ->client && attacker && attacker->client ) {
+		vec3_t vel;
+		gentity_t *item;
+		int bigItem;
+		int smallItem;
+
+		item = NULL;
+
+		// FIXME unused
+		bigItem = rand() % 20;
+
+		vel[0] = rand() % 750;
+		vel[1] = rand() % 750;
+		vel[2] = rand() % 750;
+
+		if ( vel[2] < 0 ) {
+			vel[2] = -vel[2];
+		}
+
+		if ( damage >= 100 ) {
+			item = LaunchItem( BG_FindItem( "50 Health" ), targ->client->ps.origin, vel );
+		} else if ( damage > 50 ) {
+			item = LaunchItem( BG_FindItem( "25 Health" ), targ->client->ps.origin, vel );
+		} else {
+			smallItem = rand() % 10;
+
+			if ( smallItem == 1 ) {
+				item = LaunchItem( BG_FindItem( "5 Health" ), targ->client->ps.origin, vel );
+			} else if ( smallItem == 5 ) {
+				item = LaunchItem( BG_FindItem( "Armor Shard" ), targ->client->ps.origin, vel );
+			}
+		}
+
+		if ( item ) {
+			item->target_ent = attacker;
+		}
 	}
 
 	// add to the damage inflicted on a player this frame
@@ -600,7 +760,9 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 	}
 
 	// See if it's the player hurting the emeny flag carrier
-	Team_CheckHurtCarrier(targ, attacker);
+	if( g_gametype.integer == GT_CTF) {
+		Team_CheckHurtCarrier(targ, attacker);
+	}
 
 	if (targ->client) {
 		// set the last client who damaged the target
@@ -608,28 +770,66 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 		targ->client->lasthurt_mod = mod;
 	}
 
-	// do the damage
-	if (take) {
-		targ->health = targ->health - take;
+	if ( take ) {
+		// track damage stats
+		if ( targ->client && attacker->client && attacker != targ ) {
+			if ( !OnSameTeam( targ, attacker ) || level.arenas[targ->client->ps.persistant[PERS_ARENA]].settings.type == AT_PRACTICE ) {
+				if ( level.arenas[targ->client->ps.persistant[PERS_ARENA]].state != ROUND_WARMUP ) {
+					// FIXME these clamps seem insane
+					int score;
+
+					score = MAX( asave, 0 ) + CLAMP( take, 0, targ->health );
+
+					attacker->client->pers.damage += MIN( score, 500 );
+
+					if ( level.arenas[targ->client->ps.persistant[PERS_ARENA]].settings.type == AT_PRACTICE ) {
+						int score = attacker->client->pers.damage / 100;
+
+						if ( attacker->client->ps.persistant[PERS_SCORE] != score ) {
+							attacker->client->ps.persistant[PERS_SCORE] = score;
+							update_hud_scores( targ->client->ps.persistant[PERS_ARENA] );
+						}
+					}
+
+					client->pers.combatStats[attacker->client->ps.clientNum].damageTaken += MIN( score, 500 );
+					attacker->client->pers.combatStats[client->ps.clientNum].damageGiven += MIN( score, 500 );
+
+					attacker->client->pers.lastDamage.targetNum = client->ps.clientNum;
+					client->pers.lastDamage.attackerNum = attacker->client->ps.clientNum;
+
+					G_SetStat( targ, TS_DMGTAKEN, MIN( score, 500 ) );
+					G_SetStat( attacker, TS_DMGGIVEN, MIN( score, 500 ) );
+				}
+			}
+		}
+
+		// apply the damage
+		if ( targ->client && !( dflags & DAMAGE_NO_PROTECTION ) &&
+		     level.arenas[targ->client->ps.persistant[PERS_ARENA]].settings.type == AT_PRACTICE ) {
+			// nop
+		} else {
+			targ->health -= take;
+		}
+
 		if ( targ->client ) {
 			targ->client->ps.stats[STAT_HEALTH] = targ->health;
 		}
-			
-		if ( targ->health <= 0 ) {
-			if ( client )
-				targ->flags |= FL_NO_KNOCKBACK;
 
-			if (targ->health < -999)
+		if ( targ->health <= 0 ) {
+			if ( client ) {
+				targ->flags |= FL_NO_KNOCKBACK;
+			}
+
+			if ( targ->health < -999 ) {
 				targ->health = -999;
+			}
 
 			targ->enemy = attacker;
-			targ->die (targ, inflictor, attacker, take, mod);
-			return;
+			targ->die( targ, inflictor, attacker, take, mod );
 		} else if ( targ->pain ) {
-			targ->pain (targ, attacker, take);
+			targ->pain( targ, attacker, take );
 		}
 	}
-
 }
 
 
@@ -641,10 +841,12 @@ Returns qtrue if the inflictor can directly damage the target.  Used for
 explosions and melee attacks.
 ============
 */
-qboolean CanDamage (gentity_t *targ, vec3_t origin) {
+qboolean CanDamage( gentity_t *targ, vec3_t origin, float *ceilingDist ) {
 	vec3_t	dest;
 	trace_t	tr;
 	vec3_t	midpoint;
+
+	*ceilingDist = 0.0f;
 
 	// use the midpoint of the bounds instead of the origin, because
 	// bmodels may have their origin is 0,0,0
@@ -653,8 +855,17 @@ qboolean CanDamage (gentity_t *targ, vec3_t origin) {
 
 	VectorCopy (midpoint, dest);
 	trap_Trace ( &tr, origin, vec3_origin, vec3_origin, dest, ENTITYNUM_NONE, MASK_SOLID);
-	if (tr.fraction == 1.0)
+	if (tr.fraction == 1.0 || tr.entityNum == targ->s.number)
 		return qtrue;
+
+	// not entirely sure what this is doing. G_RadiusDamage knows targ is within radius
+	// units of origin, the trace from origin to target's midpoint is hitting something,
+	// but that something is pointing downwards so it's ok. perhaps the goal here is to
+	// allow splash damage through ceilings / floors
+	if ( tr.fraction < 1.0 && tr.plane.normal[2] < 0.0f ) {
+		*ceilingDist = Distance( tr.endpos, midpoint );
+		return qtrue;
+	}
 
 	// this should probably check in the plane of projection, 
 	// rather than in world coordinate, and also include Z
@@ -698,7 +909,7 @@ G_RadiusDamage
 */
 qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, float radius,
 					 gentity_t *ignore, int mod) {
-	float		points, dist;
+	float		points, dist, ceilingDist;
 	gentity_t	*ent;
 	int			entityList[MAX_GENTITIES];
 	int			numListedEntities;
@@ -706,7 +917,10 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 	vec3_t		v;
 	vec3_t		dir;
 	int			i, e;
-	qboolean	hitClient = qfalse;
+	qboolean	hitClient;
+
+	ceilingDist = 0.0f;
+	hitClient = qfalse;
 
 	if ( radius < 1 ) {
 		radius = 1;
@@ -745,15 +959,26 @@ qboolean G_RadiusDamage ( vec3_t origin, gentity_t *attacker, float damage, floa
 
 		points = damage * ( 1.0 - dist / radius );
 
-		if( CanDamage (ent, origin) ) {
-			if( LogAccuracyHit( ent, attacker ) ) {
+		if ( CanDamage( ent, origin, &ceilingDist ) ) {
+			// nerf splash damage through ceilings / floors
+			if ( ceilingDist > 0.0f ) {
+				points -= ceilingDist / 4.0f;
+				points = MAX( points, 0.0f );
+			}
+
+			if ( LogAccuracyHit( ent, attacker ) ) {
 				hitClient = qtrue;
 			}
-			VectorSubtract (ent->r.currentOrigin, origin, dir);
+
+			VectorSubtract( ent->r.currentOrigin, origin, dir );
+
 			// push the center of mass higher than the origin so players
 			// get knocked into the air more
 			dir[2] += 24;
-			G_Damage (ent, NULL, attacker, dir, origin, (int)points, DAMAGE_RADIUS, mod);
+
+			if ( points > 0.0f ) {
+				G_Damage( ent, NULL, attacker, dir, origin, (int)points, DAMAGE_RADIUS, mod );
+			}
 		}
 	}
 
