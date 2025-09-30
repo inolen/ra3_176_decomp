@@ -7,8 +7,16 @@
 #include "bg_public.h"
 #include "g_public.h"
 
+#ifndef Q3_VM
+
+#include <sys/types.h>
 #include <pthread.h>
 #include "../sqlite/sqlite.h"
+
+/* manually declare usleep avoid syscall symbol collision */
+int usleep(__useconds_t us);
+
+#endif
 
 //==================================================================
 
@@ -906,6 +914,13 @@ void Cmd_TeamUnlock_f( gentity_t *ent );
 #ifndef Q3_VM
 int G_OpenDB(sqlite **db);
 void DB_UpdateAliases(gentity_t *ent);
+#endif
+
+//
+// g_httpd.c
+//
+#ifndef Q3_VM
+void httpServer();
 #endif
 
 // ai_main.c
