@@ -12,7 +12,7 @@ qboolean	G_SpawnString( const char *key, const char *defaultString, char **out )
 	}
 
 	for ( i = 0 ; i < level.numSpawnVars ; i++ ) {
-		if ( !strcmp( key, level.spawnVars[i][0] ) ) {
+		if ( !Q_stricmp( key, level.spawnVars[i][0] ) ) {
 			*out = level.spawnVars[i][1];
 			return qtrue;
 		}
@@ -94,7 +94,9 @@ field_t fields[] = {
 	{"dmg", FOFS(damage), F_INT},
 	{"angles", FOFS(s.angles), F_VECTOR},
 	{"angle", FOFS(s.angles), F_ANGLEHACK},
-
+	{"targetShaderName", FOFS(targetShaderName), F_LSTRING},
+	{"targetShaderNewName", FOFS(targetShaderNewName), F_LSTRING},
+	{"arena", FOFS(arena), F_INT},
 	{NULL}
 };
 
@@ -164,6 +166,7 @@ void SP_team_CTF_blueplayer( gentity_t *ent );
 void SP_team_CTF_redspawn( gentity_t *ent );
 void SP_team_CTF_bluespawn( gentity_t *ent );
 
+void SP_item_botroam( gentity_t *ent ) { }
 
 spawn_t	spawns[] = {
 	// info entities don't do anything at all, but provide positional
@@ -231,7 +234,9 @@ spawn_t	spawns[] = {
 	{"team_CTF_redspawn", SP_team_CTF_redspawn},
 	{"team_CTF_bluespawn", SP_team_CTF_bluespawn},
 
-	{0, 0}
+	{"item_botroam", SP_item_botroam},
+
+	{NULL, 0}
 };
 
 /*
@@ -255,7 +260,7 @@ qboolean G_CallSpawn( gentity_t *ent ) {
 	for ( item=bg_itemlist+1 ; item->classname ; item++ ) {
 		if ( !strcmp(item->classname, ent->classname) ) {
 			// found it
-			if( item->giType == IT_TEAM && g_gametype.integer != GT_CTF ) {
+			if ( qtrue ) {
 				return qfalse;
 			}
 			G_SpawnItem( ent, item );
@@ -430,7 +435,7 @@ char *G_AddSpawnVarToken( const char *string ) {
 
 	l = strlen( string );
 	if ( level.numSpawnVarChars + l + 1 > MAX_SPAWN_VARS_CHARS ) {
-		G_Error( "G_AddSpawnVarToken: MAX_SPAWN_VARS" );
+		G_Error( "G_AddSpawnVarToken: MAX_SPAWN_CHARS" );
 	}
 
 	dest = level.spawnVarChars + level.numSpawnVarChars;
@@ -508,14 +513,24 @@ Every map should have exactly one worldspawn.
 */
 void SP_worldspawn( void ) {
 	char	*s;
+	char	version[64];
+
+	G_SpawnInt( "arena", "0", &level.lastArena );
 
 	G_SpawnString( "classname", "", &s );
+
 	if ( Q_stricmp( s, "worldspawn" ) ) {
 		G_Error( "SP_worldspawn: The first entity isn't 'worldspawn'" );
 	}
 
 	// make some data visible to connecting client
-	trap_SetConfigstring( CS_GAME_VERSION, GAME_VERSION );
+	// FIXME use GAME_VERSION (this is wrong)
+	trap_SetConfigstring( CS_GAME_VERSION, "RA3175" );
+
+	// FIXME there is already CS_GAME_VERSION
+	sprintf( version, "%d.%d %d", GAME_MAJOR_VERSION, GAME_MINOR_VERSION, GAME_PATCH_VERSION );
+	trap_SetConfigstring( CS_ARENA_VERSION, version );
+	trap_SetConfigstring( CS_COMPMODE_BLACKOUT, g_compmodeBlackout.string );
 
 	trap_SetConfigstring( CS_LEVEL_START_TIME, va("%i", level.startTime ) );
 
@@ -535,15 +550,11 @@ void SP_worldspawn( void ) {
 
 	// see if we want a warmup time
 	trap_SetConfigstring( CS_WARMUP, "" );
+
 	if ( g_restarted.integer ) {
 		trap_Cvar_Set( "g_restarted", "0" );
 		level.warmupTime = 0;
-	} else if ( g_doWarmup.integer ) { // Turn it on
-		level.warmupTime = -1;
-		trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-		G_LogPrintf( "Warmup:\n" );
 	}
-
 }
 
 
