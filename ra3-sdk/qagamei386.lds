@@ -101,6 +101,7 @@ SECTIONS
     . = 0x000a28b0 - 0x0001da34; */game/g_mem.o                    (.text .text.*);
     . = 0x000a29b0 - 0x0001da34; */game/g_misc.o                   (.text .text.*);
     . = 0x000a3420 - 0x0001da34; */game/g_missile.o                (.text .text.*);
+    . = 0x000a5648 - 0x0001da34; */game/g_mover.o                  (.text .text.*);
 
     *(.text .text.*);
   } :text =0x90909090
@@ -145,6 +146,7 @@ SECTIONS
     . = 0x000d3880 - 0x000bdf40; */game/g_mem.o        (.rodata);
     . = 0x000d3960 - 0x000bdf40; */game/g_misc.o       (.rodata);
     . = 0x000d3a18 - 0x000bdf40; */game/g_missile.o    (.rodata);
+    . = 0x000d3ac0 - 0x000bdf40; */game/g_mover.o      (.rodata);
 
     *(.rodata);
   } :text
@@ -194,6 +196,7 @@ SECTIONS
     . = 0x000dd600 - 0x000d76e0; */game/g_mem.o                    (.data .data.*);
     . = 0x000dd610 - 0x000d76e0; */game/g_misc.o                   (.data .data.*);
     . = 0x000dd620 - 0x000d76e0; */game/g_missile.o                (.data .data.*);
+    . = 0x000dd630 - 0x000d76e0; */game/g_mover.o                  (.data .data.*);
 
     *(.data .data.*);
   } :data
@@ -267,6 +270,7 @@ SECTIONS
     . = 0x000e5b40 - 0x000dfc20; */game/g_mem.o                    (.bss);
     . = 0x00125b60 - 0x000dfc20; */game/g_misc.o                   (.bss);
     . = 0x00125b60 - 0x000dfc20; */game/g_missile.o                (.bss);
+    . = 0x00125b60 - 0x000dfc20; */game/g_mover.o                  (.bss);
 
     *(.bss);
     *(COMMON);

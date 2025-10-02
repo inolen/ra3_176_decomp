@@ -51,6 +51,43 @@ gentity_t	*G_TestEntityPosition( gentity_t *ent ) {
 	return NULL;
 }
 
+/*
+================
+G_CreateRotationMatrix
+================
+*/
+void G_CreateRotationMatrix(vec3_t angles, vec3_t matrix[3]) {
+	AngleVectors(angles, matrix[0], matrix[1], matrix[2]);
+	VectorInverse(matrix[1]);
+}
+
+/*
+================
+G_TransposeMatrix
+================
+*/
+void G_TransposeMatrix(vec3_t matrix[3], vec3_t transpose[3]) {
+	int i, j;
+	for (i = 0; i < 3; i++) {
+		for (j = 0; j < 3; j++) {
+			transpose[i][j] = matrix[j][i];
+		}
+	}
+}
+
+/*
+================
+G_RotatePoint
+================
+*/
+void G_RotatePoint(vec3_t point, vec3_t matrix[3]) {
+	vec3_t tvec;
+
+	VectorCopy(point, tvec);
+	point[0] = DotProduct(matrix[0], tvec);
+	point[1] = DotProduct(matrix[1], tvec);
+	point[2] = DotProduct(matrix[2], tvec);
+}
 
 /*
 ==================
@@ -60,7 +97,7 @@ Returns qfalse if the move is blocked
 ==================
 */
 qboolean	G_TryPushingEntity( gentity_t *check, gentity_t *pusher, vec3_t move, vec3_t amove ) {
-	vec3_t		forward, right, up;
+	vec3_t		matrix[3], transpose[3];
 	vec3_t		org, org2, move2;
 	gentity_t	*block;
 
@@ -84,27 +121,27 @@ qboolean	G_TryPushingEntity( gentity_t *check, gentity_t *pusher, vec3_t move, v
 	}
 	pushed_p++;
 
-	// we need this for pushing things later
-	VectorSubtract (vec3_origin, amove, org);
-	AngleVectors (org, forward, right, up);
-
 	// try moving the contacted entity 
-	VectorAdd (check->s.pos.trBase, move, check->s.pos.trBase);
-	if (check->client) {
-		// make sure the client's view rotates when on a rotating mover
-		check->client->ps.delta_angles[YAW] += ANGLE2SHORT(amove[YAW]);
-	}
-
 	// figure movement due to the pusher's amove
-	VectorSubtract (check->s.pos.trBase, pusher->r.currentOrigin, org);
-	org2[0] = DotProduct (org, forward);
-	org2[1] = -DotProduct (org, right);
-	org2[2] = DotProduct (org, up);
+	G_CreateRotationMatrix( amove, transpose );
+	G_TransposeMatrix( transpose, matrix );
+	if ( check->client ) {
+		VectorSubtract (check->client->ps.origin, pusher->r.currentOrigin, org);
+	}
+	else {
+		VectorSubtract (check->s.pos.trBase, pusher->r.currentOrigin, org);
+	}
+	VectorCopy( org, org2 );
+	G_RotatePoint( org2, matrix );
 	VectorSubtract (org2, org, move2);
+	// add movement
+	VectorAdd (check->s.pos.trBase, move, check->s.pos.trBase);
 	VectorAdd (check->s.pos.trBase, move2, check->s.pos.trBase);
 	if ( check->client ) {
 		VectorAdd (check->client->ps.origin, move, check->client->ps.origin);
 		VectorAdd (check->client->ps.origin, move2, check->client->ps.origin);
+		// make sure the client's view rotates when on a rotating mover
+		check->client->ps.delta_angles[YAW] += ANGLE2SHORT(amove[YAW]);
 	}
 
 	// may have pushed them off an edge
@@ -314,6 +351,16 @@ void G_MoverTeam( gentity_t *ent ) {
 
 	// the move succeeded
 	for ( part = ent ; part ; part = part->teamchain ) {
+		if ( part->targetname ) {
+			gentity_t *target;
+
+			target = G_Find( NULL, FOFS( target ), part->targetname );
+
+			if ( target && !strcmp( target->classname, "misc_portal_surface" ) ) {
+				locateCamera( target );
+			}
+		}
+
 		// call the reached function if time is at or past end point
 		if ( part->s.pos.trType == TR_LINEAR_STOP ) {
 			if ( level.time >= part->s.pos.trTime + part->s.pos.trDuration ) {
@@ -332,6 +379,7 @@ G_RunMover
 ================
 */
 void G_RunMover( gentity_t *ent ) {
+
 	// if not a team captain, don't do anything, because
 	// the captain will handle everything
 	if ( ent->flags & FL_TEAMSLAVE ) {
@@ -526,7 +574,7 @@ void Use_BinaryMover( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 	// only partway down before reversing
 	if ( ent->moverState == MOVER_2TO1 ) {
 		total = ent->s.pos.trDuration;
-		partial = level.time - ent->s.time;
+		partial = level.time - ent->s.pos.trTime;
 		if ( partial > total ) {
 			partial = total;
 		}
@@ -542,7 +590,7 @@ void Use_BinaryMover( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
 	// only partway up before reversing
 	if ( ent->moverState == MOVER_1TO2 ) {
 		total = ent->s.pos.trDuration;
-		partial = level.time - ent->s.time;
+		partial = level.time - ent->s.pos.trTime;
 		if ( partial > total ) {
 			partial = total;
 		}
@@ -763,6 +811,7 @@ void Think_SpawnNewDoorTrigger( gentity_t *ent ) {
 
 	// create a trigger with this size
 	other = G_Spawn ();
+	other->classname = "door_trigger";
 	VectorCopy (mins, other->r.mins);
 	VectorCopy (maxs, other->r.maxs);
 	other->parent = ent;
@@ -926,6 +975,7 @@ void SpawnPlatTrigger( gentity_t *ent ) {
 	// the middle trigger will be a thin trigger just
 	// above the starting position
 	trigger = G_Spawn();
+	trigger->classname = "plat_trigger";
 	trigger->touch = Touch_PlatCenterTrigger;
 	trigger->r.contents = CONTENTS_TRIGGER;
 	trigger->parent = ent;
