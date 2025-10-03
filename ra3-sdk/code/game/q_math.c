@@ -133,6 +133,63 @@ float	Q_crandom( int *seed ) {
 	return 2.0 * ( Q_random( seed ) - 0.5 );
 }
 
+//=======================================================
+
+int VectorCompare( const vec3_t v1, const vec3_t v2 ) {
+	if (v1[0] != v2[0] || v1[1] != v2[1] || v1[2] != v2[2]) {
+		return 0;
+	}
+			
+	return 1;
+}
+
+vec_t VectorLength( const vec3_t v ) {
+	return sqrt (v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+}
+
+vec_t VectorLengthSquared( const vec3_t v ) {
+	return v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+}
+
+vec_t Distance( const vec3_t p1, const vec3_t p2 ) {
+	vec3_t	v;
+
+	VectorSubtract (p2, p1, v);
+	return VectorLength( v );
+}
+
+vec_t DistanceSquared( const vec3_t p1, const vec3_t p2 ) {
+	vec3_t	v;
+
+	VectorSubtract (p2, p1, v);
+	return v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
+}
+
+//
+// fast vector normalize routine that does not check to make sure
+// that length != 0, nor does it return length
+//
+void VectorNormalizeFast( vec3_t v ) {
+	float ilength;
+
+	ilength = Q_rsqrt( DotProduct( v, v ) );
+
+	v[0] *= ilength;
+	v[1] *= ilength;
+	v[2] *= ilength;
+}
+
+void VectorInverse( vec3_t v ) {
+	v[0] = -v[0];
+	v[1] = -v[1];
+	v[2] = -v[2];
+}
+
+void CrossProduct( const vec3_t v1, const vec3_t v2, vec3_t cross ) {
+	cross[0] = v1[1]*v2[2] - v1[2]*v2[1];
+	cross[1] = v1[2]*v2[0] - v1[0]*v2[2];
+	cross[2] = v1[0]*v2[1] - v1[1]*v2[0];
+}
 
 //=======================================================
 
@@ -155,7 +212,6 @@ signed short ClampShort( int i ) {
 	}
 	return i;
 }
-
 
 // this isn't a real cheap function to call!
 int DirToByte( vec3_t dir ) {
@@ -188,7 +244,6 @@ void ByteToDir( int b, vec3_t dir ) {
 	}
 	VectorCopy (bytedirs[b], dir);
 }
-
 
 unsigned ColorBytes3 (float r, float g, float b) {
 	unsigned	i;
@@ -342,8 +397,6 @@ void RotateAroundDirection( vec3_t axis[3], float yaw ) {
 	CrossProduct( axis[0], axis[1], axis[2] );
 }
 
-
-
 void vectoangles( const vec3_t value1, vec3_t angles ) {
 	float	forward;
 	float	yaw, pitch;
@@ -383,7 +436,6 @@ void vectoangles( const vec3_t value1, vec3_t angles ) {
 	angles[ROLL] = 0;
 }
 
-
 /*
 =================
 AnglesToAxis
@@ -421,7 +473,11 @@ void ProjectPointOnPlane( vec3_t dst, const vec3_t p, const vec3_t normal )
 	vec3_t n;
 	float inv_denom;
 
-	inv_denom = 1.0F / DotProduct( normal, normal );
+	inv_denom = DotProduct( normal, normal );
+#ifndef Q3_VM
+	assert( Q_fabs(inv_denom) != 0.0f ); // zero vectors get here
+#endif
+	inv_denom = 1.0f / inv_denom;
 
 	d = DotProduct( normal, p ) * inv_denom;
 
@@ -457,13 +513,79 @@ void MakeNormalVectors( const vec3_t forward, vec3_t right, vec3_t up) {
 	CrossProduct (right, forward, up);
 }
 
-
 void VectorRotate( vec3_t in, vec3_t matrix[3], vec3_t out )
 {
 	out[0] = DotProduct( in, matrix[0] );
 	out[1] = DotProduct( in, matrix[1] );
 	out[2] = DotProduct( in, matrix[2] );
 }
+
+void VectorRotateX( vec3_t in, float angle, vec3_t out )
+{
+	float a, c, s;
+
+	a = (float)(angle * M_PI / 180);
+	c = (float)cos(a);
+	s = (float)sin(a);
+	out[0] = in[0];
+	out[1] = c*in[1] - s*in[2];
+	out[2] = s*in[1] + c*in[2];
+}
+
+void VectorRotateY( vec3_t in, float angle, vec3_t out )
+{
+	float a, c, s;
+
+	a = (float)(angle * M_PI / 180);
+	c = (float)cos(a);
+	s = (float)sin(a);
+	out[0] = c*in[0] + s*in[2];
+	out[1] = in[1];
+	out[2] = -s*in[0] + c*in[2];
+}
+
+void VectorRotateZ( vec3_t in, float angle, vec3_t out )
+{
+	float a, c, s;
+
+	a = (float)(angle * M_PI / 180);
+	c = (float)cos(a);
+	s = (float)sin(a);
+	out[0] = c*in[0] - s*in[1];
+	out[1] = s*in[0] + c*in[1];
+	out[2] = in[2];
+}
+
+void MakeVector( vec3_t in, vec3_t out )
+{
+	float pitch;
+	float yaw;
+	float tmp;
+
+	pitch = (float)(in[0] * M_PI / 180);
+	yaw = (float)(in[1] * M_PI / 180);
+	tmp = (float)cos(pitch);
+
+	out[0] = (float)(-tmp * -cos(yaw));
+	out[1] = (float)(sin(yaw)*tmp);
+	out[2] = (float)-sin(pitch);
+}
+
+float VectorAngle( vec3_t a, vec3_t b )
+{
+	float la = VectorLength(a);
+	float lb = VectorLength(b);
+	float lab = la * lb;
+
+	if (lab == 0.0)
+	{
+		return 0.0;
+	}
+
+	return (float)(acos(DotProduct(a, b) / lab) * (180.f / M_PI));
+}
+
+
 
 //============================================================================
 
@@ -483,6 +605,12 @@ float Q_rsqrt( float number )
 	y  = * ( float * ) &i;
 	y  = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
 //	y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
+
+#ifndef Q3_VM
+#ifdef __linux__
+	assert( !isnan(y) ); // bk010122 - FPE?
+#endif
+#endif
 
 	return y;
 }
@@ -1003,16 +1131,6 @@ void AddPointToBounds( const vec3_t v, vec3_t mins, vec3_t maxs ) {
 	}
 }
 
-
-int VectorCompare( const vec3_t v1, const vec3_t v2 ) {
-	if (v1[0] != v2[0] || v1[1] != v2[1] || v1[2] != v2[2]) {
-		return 0;
-	}
-			
-	return 1;
-}
-
-
 vec_t VectorNormalize( vec3_t v ) {
 	float	length, ilength;
 
@@ -1027,21 +1145,6 @@ vec_t VectorNormalize( vec3_t v ) {
 	}
 		
 	return length;
-}
-
-//
-// fast vector normalize routine that does not check to make sure
-// that length != 0, nor does it return length
-//
-void VectorNormalizeFast( vec3_t v )
-{
-	float ilength;
-
-	ilength = Q_rsqrt( DotProduct( v, v ) );
-
-	v[0] *= ilength;
-	v[1] *= ilength;
-	v[2] *= ilength;
 }
 
 vec_t VectorNormalize2( const vec3_t v, vec3_t out) {
@@ -1099,38 +1202,6 @@ void _VectorScale( const vec3_t in, vec_t scale, vec3_t out ) {
 	out[2] = in[2]*scale;
 }
 
-void CrossProduct( const vec3_t v1, const vec3_t v2, vec3_t cross ) {
-	cross[0] = v1[1]*v2[2] - v1[2]*v2[1];
-	cross[1] = v1[2]*v2[0] - v1[0]*v2[2];
-	cross[2] = v1[0]*v2[1] - v1[1]*v2[0];
-}
-
-vec_t VectorLength( const vec3_t v ) {
-	return sqrt (v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
-}
-
-
-vec_t Distance( const vec3_t p1, const vec3_t p2 ) {
-	vec3_t	v;
-
-	VectorSubtract (p2, p1, v);
-	return VectorLength( v );
-}
-
-vec_t DistanceSquared( const vec3_t p1, const vec3_t p2 ) {
-	vec3_t	v;
-
-	VectorSubtract (p2, p1, v);
-	return v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
-}
-
-
-void VectorInverse( vec3_t v ){
-	v[0] = -v[0];
-	v[1] = -v[1];
-	v[2] = -v[2];
-}
-
 void Vector4Scale( const vec4_t in, vec_t scale, vec4_t out ) {
 	out[0] = in[0]*scale;
 	out[1] = in[1]*scale;
@@ -1148,26 +1219,6 @@ int Q_log2( int val ) {
 	}
 	return answer;
 }
-
-
-
-/*
-=================
-PlaneTypeForNormal
-=================
-*/
-int	PlaneTypeForNormal (vec3_t normal) {
-	if ( normal[0] == 1.0 )
-		return PLANE_X;
-	if ( normal[1] == 1.0 )
-		return PLANE_Y;
-	if ( normal[2] == 1.0 )
-		return PLANE_Z;
-	
-	return PLANE_NON_AXIAL;
-}
-
-
 
 /*
 ================
