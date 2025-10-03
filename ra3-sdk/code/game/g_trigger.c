@@ -30,6 +30,17 @@ void multi_trigger( gentity_t *ent, gentity_t *activator ) {
 
 	G_UseTargets (ent, ent->activator);
 
+	if ( activator->client && ent->arena > 0 ) {
+		if ( ent->arena > level.lastArena ) {
+			trap_SendServerCommand( activator - g_entities, "BAD ARENA!!" );
+		} else {
+			trap_SendServerCommand( activator - g_entities, va( "cp \"%s\nType: %s\nPlayers: %d\"",
+			                                                    get_arena_name( ent->arena ),
+			                                                    arenatype_to_string( level.arenas[ent->arena].settings.type ),
+			                                                    count_players_in_arena( ent->arena ) ) );
+		}
+	}
+
 	if ( ent->wait > 0 ) {
 		ent->think = multi_wait;
 		ent->nextthink = level.time + ( ent->wait + ent->random * crandom() ) * 1000;
@@ -114,21 +125,7 @@ void trigger_push_touch (gentity_t *self, gentity_t *other, trace_t *trace ) {
 		return;
 	}
 
-	if ( other->client->ps.pm_type != PM_NORMAL ) {
-		return;
-	}
-	if ( other->client->ps.powerups[PW_FLIGHT] ) {
-		return;
-	}
-
-	if (other->client && other->client->hook)
-		Weapon_HookFree(other->client->hook);
-
-	if ( other->client->ps.velocity[2] < 100 ) {
-		// don't play the event sound again if we are in a fat trigger
-		G_AddPredictableEvent( other, EV_JUMP_PAD, 0 );
-	}
-	VectorCopy (self->s.origin2, other->client->ps.velocity);
+	BG_TouchJumpPad( &other->client->ps, &self->s );
 }
 
 
@@ -259,14 +256,19 @@ void trigger_teleporter_touch (gentity_t *self, gentity_t *other, trace_t *trace
 	if ( other->client->ps.pm_type == PM_DEAD ) {
 		return;
 	}
+
+	if ( self->arena ) {
+		move_to_arena_request( other, self->arena );
+		return;
+	}
+
 	// Spectators only?
 	if ( ( self->spawnflags & 1 ) && 
 		other->client->sess.sessionTeam != TEAM_SPECTATOR ) {
 		return;
 	}
 
-
-	dest = 	G_PickTarget( self->target );
+	dest = G_PickTarget( self->target );
 	if (!dest) {
 		G_Printf ("Couldn't find teleporter destination\n");
 		return;
@@ -337,7 +339,11 @@ void hurt_touch( gentity_t *self, gentity_t *other, trace_t *trace ) {
 	int		dflags;
 
 	if ( !other->takedamage ) {
-		return;
+		if ( strcmp( current_mapname(), "ra3map4" ) ) {
+			return;
+		}
+
+		other->takedamage = qtrue;
 	}
 
 	if ( self->timestamp > level.time ) {
