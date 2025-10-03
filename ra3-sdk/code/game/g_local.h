@@ -796,9 +796,10 @@ void G_RunClient( gentity_t *ent );
 //
 // g_team.c
 //
+void G_BalanceTeams(int arenaNum);
 qboolean OnSameTeam( gentity_t *ent1, gentity_t *ent2 );
 void Team_CheckDroppedItem( gentity_t *dropped );
-
+int Target_GetLocation( gentity_t *ent, char *out, int max );
 
 //
 // g_mem.c

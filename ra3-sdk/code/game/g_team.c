@@ -78,13 +78,165 @@ void QDECL PrintMsg( gentity_t *ent, const char *fmt, ... ) {
 	if (vsprintf (msg, fmt, argptr) > sizeof(msg)) {
 		G_Error ( "PrintMsg overrun" );
 	}
-	va_end (argptr);
+	// FIXME why was this removed?
+	// va_end (argptr);
 
 	// double quotes are bad
 	while ((p = strchr(msg, '"')) != NULL)
 		*p = '\'';
 
 	trap_SendServerCommand ( ( (ent == NULL) ? -1 : ent-g_entities ), va("print \"%s\"", msg ));
+}
+
+/*
+=======
+G_BalanceTeams
+==============
+*/
+void G_BalanceTeams( int arenaNum ) {
+	float			teamScore[2];
+	float			balance;
+	float			deltaScore;
+	int				i;
+	int				redPlayers;
+	int				bluePlayers;
+	int				bestPlayer;
+	int				blueTeam;
+	int				redTeam;
+	gentity_t		*ent;
+	unsigned int	minutes;
+	team_t			oldSessionTeam;
+	team_t			newSessionTeam;
+	int				oldTeam;
+	int				newTeam;
+	int				oldPlayers;
+	int				newPlayers;
+	int				bestTeam;
+	int				thisMinutes;
+	int				bestMinutes;
+	float			thisScore;
+	float			bestScore;
+	float			thisDelta;
+	float			bestDelta;
+
+	teamScore[0] = 0.0f;
+	teamScore[1] = 0.0f;
+	balance = g_autoBalance.value;
+	bestPlayer = -1;
+	blueTeam = -1;
+	redTeam = -1;
+
+	if ( level.arenas[arenaNum].settings.type != AT_CLANARENA || level.arenas[arenaNum].settings.competitionmode != 0 ||
+	     g_autoBalance.value == 0.0f ) {
+		return;
+	}
+
+	for ( i = 0, ent = g_entities; i < level.maxclients; i++, ent++ ) {
+		if ( ent->inuse == qfalse ||
+		     ent->client->pers.connected != CON_CONNECTED ||
+		     ent->client->ps.persistant[PERS_ARENA] != arenaNum ||
+		     ent->client->ps.persistant[PERS_TEAM] == TEAM_SPECTATOR ) {
+			continue;
+		}
+
+		minutes = ( level.time - ent->client->pers.enterTime ) / 60000;
+
+		if ( level.teams[ent->client->ps.persistant[PERS_TEAM]].sessionTeam == TEAM_BLUE ) {
+			if ( blueTeam < 0 ) {
+				blueTeam = ent->client->ps.persistant[PERS_TEAM];
+			}
+
+			/* FIXME making this part of a union / structure made it load blueScore onto the stack
+			   first before adding, the original code may have all of the variables in a structure? */
+			teamScore[0] += ent->client->pers.damage / ( minutes > 0 ? minutes : 1.0f );
+		}
+
+		if ( level.teams[ent->client->ps.persistant[PERS_TEAM]].sessionTeam == TEAM_RED ) {
+			if ( redTeam < 0 ) {
+				redTeam = ent->client->ps.persistant[PERS_TEAM];
+			}
+
+			teamScore[1] += ent->client->pers.damage/ ( minutes > 0 ? minutes : 1.0f );
+		}
+	}
+
+	if ( redTeam < 0 || blueTeam < 0 ) {
+		return;
+	}
+
+	redPlayers = count_players_in_team( redTeam );
+	bluePlayers = count_players_in_team( blueTeam );
+
+	deltaScore = teamScore[0] > teamScore[1] ? teamScore[0] - teamScore[1] : teamScore[1] - teamScore[0];
+
+	G_Printf( "Autobalance: (%f, %f) %f.\n", teamScore[0], teamScore[1], deltaScore );
+
+	if ( deltaScore > balance ) {
+		if ( teamScore[0] > teamScore[1] ) {
+			if ( level.teamScores[TEAM_BLUE] <= level.teamScores[TEAM_RED] || bluePlayers < redPlayers ) {
+				return;
+			}
+
+			bestTeam = blueTeam;
+		} else {
+			if ( level.teamScores[TEAM_RED] <= level.teamScores[TEAM_BLUE] || redPlayers < bluePlayers ) {
+				return;
+			}
+
+			bestTeam = redTeam;
+		}
+
+		for ( i = 0, ent = g_entities; i < level.maxclients; i++, ent++ ) {
+			if ( ent->inuse == qfalse || ent->client->pers.connected != CON_CONNECTED ||
+			     ent->client->ps.persistant[PERS_ARENA] != arenaNum || ent->client->ps.persistant[PERS_TEAM] != bestTeam ) {
+				continue;
+			}
+
+			if ( bestPlayer < 0 ) {
+				bestPlayer = i;
+			}
+
+			// FIXME this should use level.clients[bestPlayer] otherwise the best player will always
+			// be the first valid player on the best team (as ent->client == level.clients[i])
+			thisMinutes = ( level.time - ent->client->pers.enterTime ) / 60000;
+			bestMinutes = ( level.time - level.clients[i].pers.enterTime ) / 60000;
+
+			thisScore = ent->client->pers.damage / ( thisMinutes > 0 ? thisMinutes : 1.0f );
+			bestScore = level.clients[i].pers.damage / ( bestMinutes > 0 ? bestMinutes : 1.0f );
+
+			thisDelta = deltaScore > thisScore ? deltaScore - thisScore : thisScore - deltaScore;
+			bestDelta = deltaScore > bestScore ? deltaScore - bestScore : bestScore - deltaScore;
+
+			if ( thisDelta < bestDelta ) {
+				bestPlayer = i;
+			}
+		}
+
+		if ( bestPlayer < 0 ) {
+			return;
+		}
+
+		oldTeam = level.clients[bestPlayer].ps.persistant[PERS_TEAM];
+		oldSessionTeam = level.teams[oldTeam].sessionTeam;
+		oldPlayers = oldTeam == blueTeam ? bluePlayers : redPlayers;
+
+		newSessionTeam = oldSessionTeam == TEAM_BLUE ? TEAM_RED : TEAM_BLUE;
+		newTeam = oldTeam == blueTeam ? redTeam : blueTeam;
+		newPlayers = newTeam == blueTeam ? bluePlayers : redPlayers;
+
+		if ( ( oldPlayers - 1 ) <= 0 ) {
+			return;
+		}
+
+		level.clients[bestPlayer].ps.persistant[PERS_TEAM] = newTeam;
+
+		set_sessionteam_and_skin( g_entities + bestPlayer, newSessionTeam );
+
+		// FIXME this should use newTeam not newSessionTeam
+		show_string( va( "print \"Teams autobalanced. %s" S_COLOR_WHITE " moved to the %s" S_COLOR_WHITE " team.\n\"",
+		                 level.clients[bestPlayer].pers.netname, level.teams[newSessionTeam].name ),
+		             arenaNum );
+	}
 }
 
 /*
@@ -101,7 +253,7 @@ qboolean OnSameTeam( gentity_t *ent1, gentity_t *ent2 ) {
 		return qfalse;
 	}
 
-	if ( ent1->client->sess.sessionTeam == ent2->client->sess.sessionTeam ) {
+	if ( ent1->client->ps.persistant[PERS_TEAM] == ent2->client->ps.persistant[PERS_TEAM] ) {
 		return qtrue;
 	}
 
@@ -545,6 +697,74 @@ int Pickup_Team( gentity_t *ent, gentity_t *other ) {
 
 /*
 ===========
+Target_GetLocation
+===========
+*/
+int Target_GetLocation( gentity_t *ent, char *out, int outSize ) {
+	vec3_t		forward;
+	vec3_t		right;
+	vec3_t		up;
+	vec3_t		end;
+	vec3_t		start;
+	trace_t		tr;
+	gentity_t	*loc;
+	gentity_t	*best;
+	float		bestDist;
+	float		dist;
+	vec3_t		origin;
+
+	AngleVectors( ent->client->ps.viewangles, forward, right, up );
+	VectorCopy( ent->s.pos.trBase, start );
+	start[2] += ent->client->ps.viewheight;
+	VectorMA( start, 14.0f, forward, start );
+	SnapVector( start );
+	VectorMA( start, 8192.0f, forward, end );
+
+	trap_Trace( &tr, start, NULL, NULL, end, ent->s.number, -1 );
+	SnapVectorTowards( tr.endpos, start );
+
+	best = NULL;
+	bestDist = 3 * 8192.0 * 8192.0;
+	VectorCopy( tr.endpos, origin );
+
+	for ( loc = level.locationHead; loc; loc = loc->nextTrain ) {
+		dist = ( origin[0] - loc->r.currentOrigin[0] ) * ( origin[0] - loc->r.currentOrigin[0] ) +
+		       ( origin[1] - loc->r.currentOrigin[1] ) * ( origin[1] - loc->r.currentOrigin[1] ) +
+		       ( origin[2] - loc->r.currentOrigin[2] ) * ( origin[2] - loc->r.currentOrigin[2] );
+
+		if ( dist > bestDist ) {
+			continue;
+		}
+
+		if ( !trap_InPVS( origin, loc->r.currentOrigin ) ) {
+			continue;
+		}
+
+		bestDist = dist;
+		best = loc;
+	}
+
+	if ( !best ) {
+		return 0;
+	}
+
+	if ( best->count ) {
+		if ( best->count < 0 ) {
+			best->count = 0;
+		}
+		if ( best->count > 7 ) {
+			best->count = 7;
+		}
+		Com_sprintf( out, outSize, "%c%c%s" S_COLOR_WHITE "", Q_COLOR_ESCAPE, '0' + best->count, best->message );
+	} else {
+		Com_sprintf( out, outSize, "%s", best->message );
+	}
+
+	return 1;
+}
+
+/*
+===========
 Team_GetLocation
 
 Report a location for the player. Uses placed nearby target_location entities
@@ -711,24 +931,12 @@ void TeamplayInfoMessage( gentity_t *ent ) {
 	gentity_t	*player;
 	int			cnt;
 	int			h, a;
-	int			clients[TEAM_MAXOVERLAY];
+
+	// FIXME unused
+	(void)SortClients;
 
 	if ( ! ent->client->pers.teamInfo )
 		return;
-
-	// figure out what client should be on the display
-	// we are limited to 8, but we want to use the top eight players
-	// but in client order (so they don't keep changing position on the overlay)
-	for (i = 0, cnt = 0; i < g_maxclients.integer && cnt < TEAM_MAXOVERLAY; i++) {
-		player = g_entities + level.sortedClients[i];
-		if (player->inuse && player->client->sess.sessionTeam == 
-			ent->client->sess.sessionTeam ) {
-			clients[cnt++] = level.sortedClients[i];
-		}
-	}
-
-	// We have the top eight players, sort them by clientNum
-	qsort( clients, cnt, sizeof( clients[0] ), SortClients );
 
 	// send the latest information on all clients
 	string[0] = 0;
@@ -736,29 +944,35 @@ void TeamplayInfoMessage( gentity_t *ent ) {
 
 	for (i = 0, cnt = 0; i < g_maxclients.integer && cnt < TEAM_MAXOVERLAY; i++) {
 		player = g_entities + i;
-		if (player->inuse && player->client->sess.sessionTeam == 
-			ent->client->sess.sessionTeam ) {
 
-			h = player->client->ps.stats[STAT_HEALTH];
-			a = player->client->ps.stats[STAT_ARMOR];
-			if (h < 0) h = 0;
-			if (a < 0) a = 0;
-
-			Com_sprintf (entry, sizeof(entry),
-				" %i %i %i %i %i %i", 
-//				level.sortedClients[i], player->client->pers.teamState.location, h, a, 
-				i, player->client->pers.teamState.location, h, a, 
-				player->client->ps.weapon, player->s.powerups);
-			j = strlen(entry);
-			if (stringlength + j > sizeof(string))
-				break;
-			strcpy (string + stringlength, entry);
-			stringlength += j;
-			cnt++;
+		if ( player->inuse == qfalse ||
+		     player->client->sess.sessionTeam != ent->client->sess.sessionTeam ||
+		     player == ent ||
+		     player->client->ps.persistant[PERS_ARENA] != ent->client->ps.persistant[PERS_ARENA] ) {
+			continue;
 		}
+
+		h = player->client->ps.stats[STAT_HEALTH];
+		a = player->client->ps.stats[STAT_ARMOR];
+
+		if (h < 0) h = 0;
+		if (a < 0) a = 0;
+
+		Com_sprintf (entry, sizeof(entry),
+			" %i %i %i %i %i %i", 
+			i, player->client->pers.teamState.location, h, a, 
+			player->client->ps.weapon, player->s.powerups);
+		j = strlen(entry);
+		if (stringlength + j > sizeof(string))
+			break;
+		strcpy (string + stringlength, entry);
+		stringlength += j;
+		cnt++;
 	}
 
-	trap_SendServerCommand( ent-g_entities, va("tinfo %i%s", cnt, string) );
+	if ( cnt > 0 ) {
+		trap_SendServerCommand( ent-g_entities, va("tinfo %i%s", cnt, string) );
+	}
 }
 
 void CheckTeamStatus(void)

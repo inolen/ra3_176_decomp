@@ -108,6 +108,7 @@ SECTIONS
     . = 0x000acba0 - 0x0001da34; */game/g_svcmds.o                 (.text .text.*);
     . = 0x000ae064 - 0x0001da34; */game/g_syscalls.o               (.text .text.*);
     . = 0x000b0088 - 0x0001da34; */game/g_target.o                 (.text .text.*);
+    . = 0x000b1068 - 0x0001da34; */game/g_team.o                   (.text .text.*);
 
     *(.text .text.*);
   } :text =0x90909090
@@ -159,6 +160,7 @@ SECTIONS
     . = 0x000d4ca0 - 0x000bdf40; */game/g_svcmds.o     (.rodata);
     . = 0x000d5358 - 0x000bdf40; */game/g_syscalls.o   (.rodata);
     . = 0x000d5380 - 0x000bdf40; */game/g_target.o     (.rodata);
+    . = 0x000d54e0 - 0x000bdf40; */game/g_team.o       (.rodata);
 
     *(.rodata);
   } :text
@@ -215,6 +217,7 @@ SECTIONS
     . = 0x000dd97c - 0x000d76e0; */game/g_svcmds.o                 (.data .data.*);
     . = 0x000dd98c - 0x000d76e0; */game/g_syscalls.o               (.data .data.*);
     . = 0x000dd9a0 - 0x000d76e0; */game/g_target.o                 (.data .data.*);
+    . = 0x000dd9b0 - 0x000d76e0; */game/g_team.o                   (.data .data.*);
 
     *(.data .data.*);
   } :data
@@ -295,6 +298,7 @@ SECTIONS
     . = 0x00125b60 - 0x000dfc20; */game/g_svcmds.o                 (.bss);
     . = 0x00127c80 - 0x000dfc20; */game/g_syscalls.o               (.bss);
     . = 0x00127c80 - 0x000dfc20; */game/g_target.o                 (.bss);
+    . = 0x00127c80 - 0x000dfc20; */game/g_team.o                   (.bss);
 
     *(.bss);
     *(COMMON);

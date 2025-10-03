@@ -2,10 +2,6 @@
 //
 #include "g_local.h"
 
-// FIXME temporary stubs
-int Target_GetLocation( gentity_t *ent, char *out, int outSize );
-//
-
 /*
 ==================
 DeathmatchScoreboardMessage

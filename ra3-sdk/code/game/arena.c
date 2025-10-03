@@ -1,9 +1,5 @@
 #include "g_local.h"
 
-// FIXME temporary stubs
-extern void G_BalanceTeams(int arenaNum);
-//
-
 int trueframetime = 50;
 int idmap;
 
