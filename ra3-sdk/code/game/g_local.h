@@ -733,6 +733,9 @@ qboolean SpotWouldTelefrag( gentity_t *spot );
 //
 // g_svcmds.c
 //
+void G_Pause( int arenaNum );
+void G_UnPause( int arenaNum );
+
 qboolean	ConsoleCommand( void );
 void G_ProcessIPBans(void);
 char *G_FilterPacket (char *from);

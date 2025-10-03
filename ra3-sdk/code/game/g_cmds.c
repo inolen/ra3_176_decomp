@@ -3,9 +3,6 @@
 #include "g_local.h"
 
 // FIXME temporary stubs
-void G_Pause( int arenaNum );
-void G_UnPause( int arenaNum );
-
 int Target_GetLocation( gentity_t *ent, char *out, int outSize );
 //
 

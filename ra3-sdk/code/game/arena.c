@@ -2,9 +2,6 @@
 
 // FIXME temporary stubs
 extern void G_BalanceTeams(int arenaNum);
-
-extern void G_Pause( int arenaNum );
-extern void G_UnPause( int arenaNum );
 //
 
 int trueframetime = 50;
