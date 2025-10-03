@@ -53,6 +53,8 @@ void Use_target_remove_powerups( gentity_t *ent, gentity_t *other, gentity_t *ac
 		Team_ReturnFlag(TEAM_RED);
 	} else if ( activator->client->ps.powerups[PW_BLUEFLAG] ) {
 		Team_ReturnFlag(TEAM_BLUE);
+	} else if( activator->client->ps.powerups[PW_NEUTRALFLAG] ) {
+		Team_ReturnFlag( TEAM_FREE );
 	}
 
 	memset( activator->client->ps.powerups, 0, sizeof( activator->client->ps.powerups ) );
@@ -413,7 +415,7 @@ static void target_location_linkup(gentity_t *ent)
 	trap_SetConfigstring( CS_LOCATIONS, "unknown" );
 
 	for (i = 0, ent = g_entities, n = 1;
-			i < level.num_entities;
+			i < level.num_entities && n < MAX_LOCATIONS;
 			i++, ent++) {
 		if (ent->classname && !Q_stricmp(ent->classname, "target_location")) {
 			// lets overload some variables!
