@@ -571,6 +571,9 @@ void MakeVector( vec3_t in, vec3_t out )
 	out[2] = (float)-sin(pitch);
 }
 
+#ifndef Q3_VM
+
+// not actually used, ifdef'd to avoid dealing with acos
 float VectorAngle( vec3_t a, vec3_t b )
 {
 	float la = VectorLength(a);
@@ -585,7 +588,7 @@ float VectorAngle( vec3_t a, vec3_t b )
 	return (float)(acos(DotProduct(a, b) / lab) * (180.f / M_PI));
 }
 
-
+#endif
 
 //============================================================================
 
