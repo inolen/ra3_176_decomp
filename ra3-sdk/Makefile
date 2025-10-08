@@ -20,10 +20,10 @@ debug: makedirs
 # common rules
 # ------------------------------------------------------------------------------
 
-SRCDIR = code
-OBJDIR = build
-BINEXT =
-LIBEXT = .so
+SRCDIR=code
+OBJDIR=build
+BINEXT=
+LIBEXT=.so
 
 CFLAGS = -MMD -fPIC
 LDFLAGS = -shared -lpthread -Wl,-Map,$(OBJDIR)/qagamei386.map
@@ -65,16 +65,10 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 LBURG_SRC = \
   $(SRCDIR)/tools/lcc/lburg/lburg.c \
   $(SRCDIR)/tools/lcc/lburg/gram.c
-LBURG_OBJ = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(LBURG_SRC))
-LBURG = $(OBJDIR)/lburg$(BINEXT)
 
 Q3ASM_SRC = \
   $(SRCDIR)/tools/asm/q3asm.c \
   $(SRCDIR)/tools/asm/cmdlib.c
-Q3ASM_OBJ = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(Q3ASM_SRC))
-Q3ASM = $(OBJDIR)/q3asm$(BINEXT)
-
-$(Q3ASM_OBJ): CFLAGS+=-I$(CURDIR)/$(SRCDIR)/tools/lcc/src
 
 Q3CPP_SRC = \
   $(SRCDIR)/tools/lcc/cpp/cpp.c \
@@ -87,16 +81,10 @@ Q3CPP_SRC = \
   $(SRCDIR)/tools/lcc/cpp/hideset.c \
   $(SRCDIR)/tools/lcc/cpp/getopt.c \
   $(SRCDIR)/tools/lcc/cpp/unix.c
-Q3CPP_OBJ = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(Q3CPP_SRC))
-Q3CPP = $(OBJDIR)/q3cpp$(BINEXT)
 
 Q3LCC_SRC = \
   $(SRCDIR)/tools/lcc/etc/lcc.c \
   $(SRCDIR)/tools/lcc/etc/bytecode.c
-Q3LCC_OBJ = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(Q3LCC_SRC))
-Q3LCC = $(OBJDIR)/q3lcc$(BINEXT)
-
-$(Q3LCC_OBJ): CFLAGS+=-DTEMPDIR=\"/tmp\"
 
 Q3RCC_SRC = \
   $(SRCDIR)/tools/lcc/src/alloc.c \
@@ -127,8 +115,21 @@ Q3RCC_SRC = \
   $(SRCDIR)/tools/lcc/src/trace.c \
   $(SRCDIR)/tools/lcc/src/tree.c \
   $(SRCDIR)/tools/lcc/src/types.c
-Q3RCC_OBJ = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(Q3RCC_SRC)) $(OBJDIR)/tools/lcc/src/dagcheck.o
+
+LBURG_OBJ = $(LBURG_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+Q3ASM_OBJ = $(Q3ASM_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+Q3CPP_OBJ = $(Q3CPP_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+Q3LCC_OBJ = $(Q3LCC_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+Q3RCC_OBJ = $(Q3RCC_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o) $(OBJDIR)/tools/lcc/src/dagcheck.o
+
+LBURG = $(OBJDIR)/lburg$(BINEXT)
+Q3ASM = $(OBJDIR)/q3asm$(BINEXT)
+Q3CPP = $(OBJDIR)/q3cpp$(BINEXT)
+Q3LCC = $(OBJDIR)/q3lcc$(BINEXT)
 Q3RCC = $(OBJDIR)/q3rcc$(BINEXT)
+
+$(Q3ASM_OBJ): CFLAGS+=-I$(CURDIR)/$(SRCDIR)/tools/lcc/src
+$(Q3LCC_OBJ): CFLAGS+=-DTEMPDIR=\"/tmp\"
 
 $(OBJDIR)/tools/lcc/src/dagcheck.o: CFLAGS+=-I$(CURDIR)/$(SRCDIR)/tools/lcc/src
 
@@ -191,15 +192,11 @@ SQLITE_SRC = \
   $(SRCDIR)/sqlite/sql_util.c \
   $(SRCDIR)/sqlite/sql_vdbe.c \
   $(SRCDIR)/sqlite/sql_where.c
-SQLITE_OBJ = $(SQLITE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
-
-$(SQLITE_OBJ): CFLAGS+=-DNO_TCL
 
 HTTPD_SRC = \
   $(SRCDIR)/httpd/api.c \
   $(SRCDIR)/httpd/ip_acl.c \
   $(SRCDIR)/httpd/protocol.c
-HTTPD_OBJ = $(HTTPD_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
 GAME_SRC = \
   $(SRCDIR)/game/ai_chat.c \
@@ -244,17 +241,38 @@ GAME_SRC = \
   $(SRCDIR)/game/g_weapon.c \
   $(SRCDIR)/game/q_math.c \
   $(SRCDIR)/game/q_shared.c
-GAME_OBJ = $(GAME_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 
-$(GAME_OBJ): CFLAGS+=-Werror -Wall -DQAGAME
+ifeq ($(ENABLE_QVM),1)
+  GAME_OBJ=$(GAME_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.asm)
 
-QAGAME_OBJ = $(SQLITE_OBJ) $(HTTPD_OBJ) $(GAME_OBJ)
-QAGAME = $(OBJDIR)/qagamei386.so
+  # vmMain has to be the first function in the file
+  QAGAME_TMP := $(filter-out $(OBJDIR)/game/g_main.asm $(OBJDIR)/game/g_syscalls.asm,$(GAME_OBJ))
+  QAGAME_OBJ = $(OBJDIR)/game/g_main.asm $(QAGAME_TMP)
+  QAGAME = $(OBJDIR)/qagame.qvm
 
-$(QAGAME): $(QAGAME_OBJ)
+  $(OBJDIR)/%.asm: $(SRCDIR)/%.c $(Q3LCC)
+		$(ECHO) "CC $<"
+		$(Q)$(CC) -DQAGAME -MM -MT $@ -MF $(@:%.asm=%.d) $<
+		$(Q)$(Q3LCC) -DQAGAME -o $@ -c $<
+
+  $(QAGAME): $(QAGAME_OBJ) $(SRCDIR)/game/g_syscalls.asm $(Q3ASM)
+		$(ECHO) "LD $@"
+		$(Q)$(Q3ASM) -v -o $@ $(QAGAME_OBJ) $(SRCDIR)/game/g_syscalls.asm $(QAGAME_LDFLAGS)
+else
+  SQLITE_OBJ = $(SQLITE_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+  HTTPD_OBJ = $(HTTPD_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+  GAME_OBJ = $(GAME_SRC:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+
+  $(SQLITE_OBJ): CFLAGS+=-DNO_TCL
+  $(GAME_OBJ): CFLAGS+=-Werror -Wall -DQAGAME
+
+  QAGAME_OBJ = $(SQLITE_OBJ) $(HTTPD_OBJ) $(GAME_OBJ)
+  QAGAME = $(OBJDIR)/qagamei386.so
+
+  $(QAGAME): $(QAGAME_OBJ)
 	$(ECHO) "LD $@"
 	$(Q)$(CC) $(LDFLAGS) -o $@ $^
+endif
 
-QAGAME_DEP = $(QAGAME_OBJ:%.o=%.d)
-
+QAGAME_DEP = $(patsubst %.asm,%.d,$(patsubst %.o,%.d,$(QAGAME_OBJ)))
 -include $(QAGAME_DEP)
