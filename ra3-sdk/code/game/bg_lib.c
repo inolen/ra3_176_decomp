@@ -50,7 +50,6 @@ static const char rcsid[] =
 	"$Id: bg_lib.c,v 1.23 2000/02/04 06:46:50 zoid Exp $";
 #endif /* LIBC_SCCS and not lint */
 
-typedef int		 cmp_t(const void *, const void *);
 static char* med3(char *, char *, char *, cmp_t *);
 static void	 swapfunc(char *, char *, int, int);
 
@@ -784,6 +783,12 @@ done:
 	return buf_p - buffer;
 }
 
+int sprintf( char *str, const char *format, ... ) {
+	va_list argptr;
+	va_start( argptr, format );
+	vsprintf( str, format, argptr );
+	va_end( argptr );
+}
 
 /* this is really crappy */
 int sscanf( const char *buffer, const char *fmt, ... ) {

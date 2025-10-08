@@ -49,6 +49,7 @@ int atoi( const char *string );
 int _atoi( const char **stringPtr );
 
 int vsprintf( char *buffer, const char *fmt, va_list argptr );
+int sprintf( char *buffer, const char *fmt, ... );
 int sscanf( const char *buffer, const char *fmt, ... );
 
 // Memory functions
