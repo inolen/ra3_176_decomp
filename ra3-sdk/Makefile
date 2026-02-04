@@ -27,6 +27,13 @@ LIBEXT=.so
 
 CFLAGS = -MMD -fPIC
 LDFLAGS = -shared -lpthread -Wl,-Map,$(OBJDIR)/qagamei386.map
+UNAME := $(shell uname)
+
+ifeq ($(UNAME), Darwin)
+    SED_INPLACE := sed -i ''
+else
+    SED_INPLACE := sed -i
+endif
 
 ifeq ($(CONFIGURATION),debug)
   CFLAGS += -O0
@@ -55,8 +62,8 @@ $(OBJDIR)/%.o: $(SRCDIR)/%.c
 	$(ECHO) "CC $<"
 	$(Q)cd $(dir $<) && \
 	$(CC) $(CFLAGS) -o $(CURDIR)/$@ -c $(notdir $<) && \
-	sed -i 's#$(CURDIR)/##g' $(CURDIR)/$(OBJDIR)/$*.d && \
-	sed -i 's#\([^ ]\+\.[c|h]\)#$(dir $<)\1#g' $(CURDIR)/$(OBJDIR)/$*.d
+	$(SED_INPLACE) 's#$(CURDIR)/##g' $(CURDIR)/$(OBJDIR)/$*.d && \
+	$(SED_INPLACE) 's#\([^ ]\+\.[c|h]\)#$(dir $<)\1#g' $(CURDIR)/$(OBJDIR)/$*.d
 
 # ------------------------------------------------------------------------------
 # tools rules
